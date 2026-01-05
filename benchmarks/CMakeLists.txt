@@ -1,4 +1,3 @@
-
 file(GLOB BENCHMARK_SOURCES
     benchmarks.cpp
 )

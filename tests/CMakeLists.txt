@@ -1,3 +1,9 @@
+file(GLOB TEST_INCLUDES
+    TECS.h
+    TIndexFreeList.h
+    TSparseSet.h
+)
+
 file(GLOB TEST_SOURCES
     tests.cpp
 )

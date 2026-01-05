@@ -84,7 +84,7 @@ TEST(ECS, TestCreation1)
 	ASSERT_TRUE(ecs.HasComponent<TECS::Player>(e));
 	ASSERT_TRUE(!ecs.HasComponent<TECS::Enemy>(e));
 	ASSERT_TRUE(!ecs.HasComponent<TECS::Weapon>(e));
-
+	ASSERT_TRUE(false);
 	ASSERT_TRUE(ecs.GetComponent<TECS::Position>(e).x == player_pos_x);
 	ASSERT_TRUE(ecs.GetComponent<TECS::Position>(e).y == player_pos_y);
 

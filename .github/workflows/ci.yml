@@ -31,14 +31,5 @@ jobs:
     - name: Build
       run: cmake --build build --config Release
 
-    - name: ls1
-      run: ls .
-
-    - name: ls2
-      run: ls build/.
-
-    - name: ls3
-      run: ls build/tests/.
-
     - name: Run Tests
       run: ctest --test-dir build/tests

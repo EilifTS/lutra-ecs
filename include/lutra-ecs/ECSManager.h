@@ -8,7 +8,7 @@
 #include <vector>
 #include <cinttypes>
 
-namespace ef
+namespace lcs
 {
 	using u32 = uint32_t;
 
@@ -153,7 +153,7 @@ namespace ef
 		private:
 			EntityComponentIterationHelper(SparseSet<T>& set) : set(set) {};
 			SparseSet<T>& set;
-			template <typename... Ts> friend class ef::ECSManager;
+			template <typename... Ts> friend class lcs::ECSManager;
 		};
 
 		template <typename T>
@@ -167,7 +167,7 @@ namespace ef
 		private:
 			EntityComponentIterationHelperReverse(SparseSet<T>& set) : set(set) {};
 			SparseSet<T>& set;
-			template <typename... Ts> friend class ef::ECSManager;
+			template <typename... Ts> friend class lcs::ECSManager;
 		};
 
 		template <typename T>
@@ -203,7 +203,7 @@ namespace ef
 		private:
 			EntityTagIterationHelper(SparseTagSetT<T>& set) : set(set) {};
 			SparseTagSetT<T>& set;
-			template <typename... Ts> friend class ef::ECSManager;
+			template <typename... Ts> friend class lcs::ECSManager;
 		};
 	}
 

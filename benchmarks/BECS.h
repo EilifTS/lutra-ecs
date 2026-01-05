@@ -9,26 +9,26 @@ namespace becs
 {
 	struct Position
 	{
-		static constexpr ef::ComponentType component_type = ef::ComponentType::Component;
+		static constexpr lcs::ComponentType component_type = lcs::ComponentType::Component;
 		int x, y;
 	};
 	struct Velocity
 	{
-		static constexpr ef::ComponentType component_type = ef::ComponentType::Component;
+		static constexpr lcs::ComponentType component_type = lcs::ComponentType::Component;
 		int x, y;
 	};
 	struct Player
 	{
-		static constexpr ef::ComponentType component_type = ef::ComponentType::Component;
+		static constexpr lcs::ComponentType component_type = lcs::ComponentType::Component;
 		bool is_happy;
 		bool is_hungry;
 		bool is_here;
 		bool is_there;
 	};
 
-	using ECS = ef::ECSManager<Position, Velocity, Player>;
+	using ECS = lcs::ECSManager<Position, Velocity, Player>;
 
-	inline ef::Entity CreatePlayer(ECS& ecs, int x, int y)
+	inline lcs::Entity CreatePlayer(ECS& ecs, int x, int y)
 	{
 		auto entity = ecs.CreateEntity();
 		ecs.AddComponent<Position>(entity, { x, y });
@@ -44,7 +44,7 @@ static void BenchmarkECS(benchmark::State& state)
 
 	becs::ECS ecs{};
 
-	std::vector<ef::Entity> players;
+	std::vector<lcs::Entity> players;
 	std::vector<becs::Position> positions(player_count);
 	std::vector<becs::Velocity> velocities(player_count);
 
@@ -57,7 +57,7 @@ static void BenchmarkECS(benchmark::State& state)
 
 	for (auto _ : state)
 	{
-		for (ef::Entity e : ecs.GetAllEntitiesWithComponent<becs::Position>())
+		for (lcs::Entity e : ecs.GetAllEntitiesWithComponent<becs::Position>())
 		{
 			if (ecs.HasComponent<becs::Velocity>(e))
 			{

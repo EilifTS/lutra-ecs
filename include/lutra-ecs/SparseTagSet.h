@@ -6,7 +6,7 @@
 
 using u32 = uint32_t;
 
-namespace ef
+namespace lcs
 {
 	class SparseTagSet
 	{

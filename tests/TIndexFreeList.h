@@ -4,7 +4,7 @@
 
 TEST(IndexFreeList, GetIndices)
 {
-	ef::IndexFreeList list{};
+	lcs::IndexFreeList list{};
 	u32 i1 = list.GetNextIndex();
 	u32 i2 = list.GetNextIndex();
 	u32 i3 = list.GetNextIndex();
@@ -16,7 +16,7 @@ TEST(IndexFreeList, GetIndices)
 
 TEST(IndexFreeList, GetAndFreeIndices)
 {
-	ef::IndexFreeList list{};
+	lcs::IndexFreeList list{};
 	u32 i1 = list.GetNextIndex();
 	u32 i2_before = list.GetNextIndex();
 	u32 i3 = list.GetNextIndex();
@@ -28,7 +28,7 @@ TEST(IndexFreeList, GetAndFreeIndices)
 
 TEST(IndexFreeList, GetAndFreeIndices2)
 {
-	ef::IndexFreeList list{};
+	lcs::IndexFreeList list{};
 	u32 i1_before = list.GetNextIndex();
 	u32 i2_before = list.GetNextIndex();
 	u32 i3_before = list.GetNextIndex();
@@ -48,7 +48,7 @@ TEST(IndexFreeList, GetAndFreeIndices2)
 
 TEST(IndexFreeList, Clear)
 {
-	ef::IndexFreeList list{};
+	lcs::IndexFreeList list{};
 	u32 i1_before = list.GetNextIndex();
 	u32 i2_before = list.GetNextIndex();
 	u32 i3_before = list.GetNextIndex();
@@ -76,7 +76,7 @@ TEST(IndexFreeList, Clear)
 
 TEST(IndexFreeList, MaxIndex)
 {
-	ef::IndexFreeList list{};
+	lcs::IndexFreeList list{};
 	const u32 i1 = list.GetNextIndex();
 	const u32 i2 = list.GetNextIndex();
 	const u32 i3 = list.GetNextIndex();
@@ -94,7 +94,7 @@ TEST(IndexFreeList, MaxIndex)
 
 TEST(IndexFreeList, IsFree)
 {
-	ef::IndexFreeList list{};
+	lcs::IndexFreeList list{};
 	const u32 i1 = list.GetNextIndex();
 	const u32 i2 = list.GetNextIndex();
 	const u32 i3 = list.GetNextIndex();
@@ -120,7 +120,7 @@ TEST(IndexFreeList, IsFree)
 
 TEST(IndexFreeList, OccupiedIterator)
 {
-	ef::IndexFreeList list{};
+	lcs::IndexFreeList list{};
 	const u32 i1 = list.GetNextIndex();
 	const u32 i2 = list.GetNextIndex();
 	const u32 i3 = list.GetNextIndex();
@@ -148,7 +148,7 @@ TEST(IndexFreeList, OccupiedIterator)
 
 TEST(IndexFreeList, OccupiedIteratorReverse)
 {
-	ef::IndexFreeList list{};
+	lcs::IndexFreeList list{};
 	const u32 i1 = list.GetNextIndex();
 	const u32 i2 = list.GetNextIndex();
 	const u32 i3 = list.GetNextIndex();
@@ -176,7 +176,7 @@ TEST(IndexFreeList, OccupiedIteratorReverse)
 
 TEST(IndexFreeList, Empty)
 {
-	ef::IndexFreeList list{};
+	lcs::IndexFreeList list{};
 	ASSERT_TRUE(list.IsFree(0));
 	ASSERT_TRUE(list.MaxIndex() == 0);
 	for (auto i : list.OccupiedIndices()) {}

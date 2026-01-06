@@ -6,6 +6,8 @@ using u64 = uint64_t;
 TEST(SparseSet, TestInsertHasGet)
 {
 	lcs::SparseSet<u64> set{};
+	set.ReserveSparseSize(103);
+
 	set.Add(100, 1);
 	ASSERT_TRUE(set.DenseSize() == 1);
 	set.Add(102, 2);
@@ -30,6 +32,8 @@ TEST(SparseSet, TestInsertHasGet)
 TEST(SparseSet, TestRemove)
 {
 	lcs::SparseSet<u64> set{};
+	set.ReserveSparseSize(56);
+
 	set.Add(33, 1);
 	ASSERT_TRUE(set.DenseSize() == 1);
 	set.Add(44, 2);
@@ -50,6 +54,8 @@ TEST(SparseSet, TestRemove)
 TEST(SparseSet, TestInsertRemoveInsert)
 {
 	lcs::SparseSet<u64> set{};
+	set.ReserveSparseSize(58);
+
 	set.Add(33, 1);
 	set.Add(44, 2);
 	set.Add(55, 3);
@@ -77,6 +83,8 @@ TEST(SparseSet, TestInsertRemoveInsert)
 TEST(SparseSet, TestInsertRemoveInsert2)
 {
 	lcs::SparseSet<u64> set{};
+	set.ReserveSparseSize(3);
+
 	set.Add(0, 0);
 	set.Add(1, 1);
 	set.Remove(1);
@@ -94,6 +102,8 @@ TEST(SparseSet, TestInsertRemoveInsert2)
 TEST(SparseSet, TestIteration)
 {
 	lcs::SparseSet<u64> set{};
+	set.ReserveSparseSize(16);
+
 	set.Add(5, 1);
 	set.Add(10, 2);
 	set.Add(15, 3);
@@ -112,6 +122,8 @@ TEST(SparseSet, TestIteration)
 TEST(SparseSet, TestIterationReverse)
 {
 	lcs::SparseSet<u64> set{};
+	set.ReserveSparseSize(16);
+
 	set.Add(5, 1);
 	set.Add(10, 2);
 	set.Add(15, 3);
@@ -129,6 +141,8 @@ TEST(SparseSet, TestIterationReverse)
 TEST(SparseSet, TestClearSparse)
 {
 	lcs::SparseSet<u64> set{};
+	set.ReserveSparseSize(16);
+
 	set.Add(5, 1);
 	set.Add(10, 2);
 	set.Add(15, 3);

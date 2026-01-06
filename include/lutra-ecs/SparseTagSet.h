@@ -22,6 +22,7 @@ namespace lcs
 		inline u32 SparseSize() const { return (u32)sparse_indices.size(); };
 		inline u32 DenseSize() const { return (u32)inverse_list.size(); };
 
+		inline void ReserveSparseSize(u32 new_size);
 		inline void Clear();
 
 		using Iterator = std::vector<u32>::iterator;
@@ -49,10 +50,7 @@ namespace lcs
 
 	void SparseTagSet::Add(u32 index)
 	{
-		if (index >= SparseSize())
-		{
-			inflateSparseSet(index + 1);
-		}
+		assert(index < SparseSize()); /* Invalid index or missing reservation */
 		assert(sparse_indices[index] == invalid_index);
 
 		inverse_list.push_back(index);
@@ -88,6 +86,12 @@ namespace lcs
 		return true;
 	}
 
+	inline void SparseTagSet::ReserveSparseSize(u32 new_size)
+	{
+		assert(new_size > SparseSize());
+		sparse_indices.resize(size_t(new_size), invalid_index);
+	}
+
 	inline void SparseTagSet::Clear()
 	{
 		sparse_indices.clear();
@@ -100,14 +104,5 @@ namespace lcs
 		if (sparse_indices[index] == invalid_index) return false;
 		if (sparse_indices[index] >= DenseSize()) return false;
 		return true;
-	}
-
-	void SparseTagSet::inflateSparseSet(u32 new_size)
-	{
-		assert(new_size > SparseSize());
-		while (SparseSize() < new_size)
-		{
-			sparse_indices.push_back(invalid_index);
-		}
 	}
 }

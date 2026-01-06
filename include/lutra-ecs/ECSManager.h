@@ -40,7 +40,7 @@ namespace lcs
 	class ECSManager
 	{
 	public:
-		ECSManager() {};
+		ECSManager() { reserveComponentStorage(reserved_component_count); };
 
 		inline EntityID CreateEntity();
 		inline void DestroyEntity(EntityID entity);
@@ -67,8 +67,14 @@ namespace lcs
 		inline void Clear();
 
 	private:
+		inline void reserveComponentStorage(u32 new_size);
+		inline void growComponentStorageIfNecessary();
+
+	private:
 		IndexFreeList entity_id_generator{};
 		std::tuple<typename internal_ecs::GetComponentContainer<Ts, Ts::component_type>::Container... > component_sets{};
+		u32 reserved_component_count{ 8 };
+		static constexpr u32 component_grow_factor = 2;
 
 		friend class Entity;
 	};
@@ -76,6 +82,7 @@ namespace lcs
 	template <typename... Ts>
 	inline EntityID ECSManager<Ts...>::CreateEntity()
 	{
+		growComponentStorageIfNecessary();
 		return EntityID(entity_id_generator.GetNextIndex());
 	}
 
@@ -186,5 +193,21 @@ namespace lcs
 	{
 		(std::get<typename internal_ecs::GetComponentContainer<Ts, Ts::component_type>::Container>(component_sets).Clear(), ...);
 		entity_id_generator.Clear();
+	}
+
+	template <typename... Ts>
+	void ECSManager<Ts...>::reserveComponentStorage(u32 new_size)
+	{
+		(std::get<typename internal_ecs::GetComponentContainer<Ts, Ts::component_type>::Container>(component_sets).ReserveSparseSize(new_size), ...);
+	}
+
+	template <typename... Ts>
+	void ECSManager<Ts...>::growComponentStorageIfNecessary()
+	{
+		if (reserved_component_count == entity_id_generator.UsedIndexCount())
+		{
+			reserved_component_count *= component_grow_factor;
+			reserveComponentStorage(reserved_component_count);
+		}
 	}
 }

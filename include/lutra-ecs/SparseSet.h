@@ -26,6 +26,7 @@ namespace lcs
 		inline u32 SparseSize() const { return u32(sparse_indices.size()); };
 		inline u32 DenseSize() const { return u32(dense_data.size()); };
 
+		inline void ReserveSparseSize(u32 new_size);
 		inline void Clear();
 
 		template <bool reverse>
@@ -83,7 +84,6 @@ namespace lcs
 		constexpr static u32 invalid_index{ u32(-1) };
 
 		inline bool isValidInputIndex(u32 index) const;
-		inline void inflateSparseSet(u32 new_size);
 
 		std::vector<u32> sparse_indices;
 		std::vector<u32> inverse_list;
@@ -93,10 +93,7 @@ namespace lcs
 	template <typename T>
 	void SparseSet<T>::Add(u32 index, T&& data)
 	{
-		if (index >= SparseSize())
-		{
-			inflateSparseSet(index + 1);
-		}
+		assert(index < SparseSize()); /* Invalid index or missing reservation */
 		assert(sparse_indices[index] == invalid_index);
 
 		dense_data.push_back(data);
@@ -146,6 +143,13 @@ namespace lcs
 	}
 
 	template <typename T>
+	inline void SparseSet<T>::ReserveSparseSize(u32 new_size)
+	{
+		assert(new_size > SparseSize());
+		sparse_indices.resize(size_t(new_size), invalid_index);
+	}
+
+	template <typename T>
 	inline void SparseSet<T>::Clear()
 	{
 		sparse_indices.clear();
@@ -160,15 +164,5 @@ namespace lcs
 		if (sparse_indices[index] == invalid_index) return false;
 		if (sparse_indices[index] >= DenseSize()) return false;
 		return true;
-	}
-
-	template <typename T>
-	void SparseSet<T>::inflateSparseSet(u32 new_size)
-	{
-		assert(new_size > SparseSize());
-		while (SparseSize() < new_size)
-		{
-			sparse_indices.push_back(invalid_index);
-		}
 	}
 }

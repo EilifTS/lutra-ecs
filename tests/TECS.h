@@ -38,7 +38,7 @@ namespace TECS
 
 	using ECS = lcs::ECSManager<Position, Velocity, Player, Enemy, Weapon, IsWet>;
 
-	inline lcs::Entity CreatePlayer(ECS& ecs, int x, int y)
+	inline lcs::EntityID CreatePlayer(ECS& ecs, int x, int y)
 	{
 		auto entity = ecs.CreateEntity();
 		ecs.AddComponent<Position>(entity, { x, y });
@@ -47,7 +47,7 @@ namespace TECS
 		return entity;
 	}
 
-	inline lcs::Entity CreateEnemy(ECS& ecs, int x, int y)
+	inline lcs::EntityID CreateEnemy(ECS& ecs, int x, int y)
 	{
 		auto entity = ecs.CreateEntity();
 		ecs.AddComponent<Position>(entity, { x, y });
@@ -78,7 +78,7 @@ TEST(ECS, TestCreation1)
 	constexpr int player_pos_x{ 2 };
 	constexpr int player_pos_y{ 1 };
 
-	lcs::Entity e = TECS::CreatePlayer(ecs, player_pos_x, player_pos_y);
+	lcs::EntityID e = TECS::CreatePlayer(ecs, player_pos_x, player_pos_y);
 	ASSERT_TRUE(ecs.HasComponent<TECS::Position>(e));
 	ASSERT_TRUE(ecs.HasComponent<TECS::Velocity>(e));
 	ASSERT_TRUE(ecs.HasComponent<TECS::Player>(e));
@@ -100,8 +100,8 @@ TEST(ECS, TestCreation2)
 	constexpr int enemy_pos_x{ 1 };
 	constexpr int enemy_pos_y{ 1 };
 
-	lcs::Entity e1 = TECS::CreatePlayer(ecs, player_pos_x, player_pos_y);
-	lcs::Entity e2 = TECS::CreateEnemy(ecs, enemy_pos_x, enemy_pos_y);
+	lcs::EntityID e1 = TECS::CreatePlayer(ecs, player_pos_x, player_pos_y);
+	lcs::EntityID e2 = TECS::CreateEnemy(ecs, enemy_pos_x, enemy_pos_y);
 
 	ASSERT_TRUE(ecs.HasComponent<TECS::Position>(e1));
 	ASSERT_TRUE(ecs.HasComponent<TECS::Velocity>(e1));
@@ -134,10 +134,10 @@ TEST(ECS, TestCreationDestruction)
 	constexpr int enemy_pos_x2{ 5 };
 	constexpr int enemy_pos_y2{ 6 };
 
-	lcs::Entity e1 = TECS::CreatePlayer(ecs, player_pos_x, player_pos_y);
-	lcs::Entity e2 = TECS::CreateEnemy(ecs, enemy_pos_x1, enemy_pos_y1);
+	lcs::EntityID e1 = TECS::CreatePlayer(ecs, player_pos_x, player_pos_y);
+	lcs::EntityID e2 = TECS::CreateEnemy(ecs, enemy_pos_x1, enemy_pos_y1);
 	ecs.DestroyEntity(e2);
-	lcs::Entity e3 = TECS::CreateEnemy(ecs, enemy_pos_x2, enemy_pos_y2);
+	lcs::EntityID e3 = TECS::CreateEnemy(ecs, enemy_pos_x2, enemy_pos_y2);
 
 	ASSERT_TRUE(ecs.HasComponent<TECS::Position>(e1));
 	ASSERT_TRUE(ecs.HasComponent<TECS::Velocity>(e1));
@@ -166,7 +166,7 @@ TEST(ECS, TestComponentRemoval)
 	constexpr int player_pos_x{ 2 };
 	constexpr int player_pos_y{ 1 };
 
-	lcs::Entity e = TECS::CreatePlayer(ecs, player_pos_x, player_pos_y);
+	lcs::EntityID e = TECS::CreatePlayer(ecs, player_pos_x, player_pos_y);
 	ecs.RemoveComponent<TECS::Velocity>(e);
 	ASSERT_TRUE(ecs.HasComponent<TECS::Position>(e));
 	ASSERT_TRUE(!ecs.HasComponent<TECS::Velocity>(e));
@@ -187,12 +187,12 @@ TEST(ECS, TestSparseIteration)
 	constexpr int player_pos_x{ 2 };
 	constexpr int player_pos_y{ 1 };
 
-	std::vector<lcs::Entity> entities;
+	std::vector<lcs::EntityID> entities;
 	for (int i = 0; i < 100; i++)
 	{
 		entities.push_back(TECS::CreatePlayer(ecs, player_pos_x + i, player_pos_y));
 	}
-	for (lcs::Entity e : ecs.GetAllEntitiesWithComponent<TECS::Position>())
+	for (lcs::EntityID e : ecs.GetAllEntitiesWithComponent<TECS::Position>())
 	{
 		ecs.GetComponent<TECS::Position>(e).x++;
 	}
@@ -223,10 +223,10 @@ TEST(ECS, TestTagCreation)
 {
 	TECS::ECS ecs{ };
 
-	lcs::Entity e1 = ecs.CreateEntity();
-	lcs::Entity e2 = ecs.CreateEntity();
-	lcs::Entity e3 = ecs.CreateEntity();
-	lcs::Entity e4 = ecs.CreateEntity();
+	lcs::EntityID e1 = ecs.CreateEntity();
+	lcs::EntityID e2 = ecs.CreateEntity();
+	lcs::EntityID e3 = ecs.CreateEntity();
+	lcs::EntityID e4 = ecs.CreateEntity();
 
 	ASSERT_TRUE(!ecs.HasTag<TECS::IsWet>(e1));
 	ASSERT_TRUE(!ecs.HasTag<TECS::IsWet>(e2));
@@ -256,13 +256,13 @@ TEST(ECS, TestTagCreation)
 
 	ecs.AddTag<TECS::IsWet>(e4);
 
-	std::vector<lcs::Entity> tagged_entities{};
+	std::vector<lcs::EntityID> tagged_entities{};
 	for (auto e : ecs.GetAllEntitiesWithTag<TECS::IsWet>())
 	{
 		tagged_entities.push_back(e);
 	}
-	ASSERT_TRUE(tagged_entities[0].GetID() == e3.GetID());
-	ASSERT_TRUE(tagged_entities[1].GetID() == e4.GetID());
+	ASSERT_TRUE(tagged_entities[0] == e3);
+	ASSERT_TRUE(tagged_entities[1] == e4);
 
 	ecs.Clear();
 }
@@ -272,10 +272,10 @@ TEST(ECS, TestDualManager)
 	TECS::ECS ecs1{ };
 	TECS::ECS ecs2{ };
 
-	lcs::Entity e1_ecs1 = ecs1.CreateEntity();
-	lcs::Entity e1_ecs2 = ecs2.CreateEntity();
-	lcs::Entity e2_ecs2 = ecs2.CreateEntity();
-	lcs::Entity e2_ecs1 = ecs1.CreateEntity();
+	lcs::EntityID e1_ecs1 = ecs1.CreateEntity();
+	lcs::EntityID e1_ecs2 = ecs2.CreateEntity();
+	lcs::EntityID e2_ecs2 = ecs2.CreateEntity();
+	lcs::EntityID e2_ecs1 = ecs1.CreateEntity();
 
 	ecs1.AddComponent<TECS::Position>(e1_ecs1, { 1, 1 });
 	ecs1.AddComponent<TECS::Position>(e2_ecs1, { 2, 1 });

@@ -28,7 +28,7 @@ namespace becs
 
 	using ECS = lcs::ECSManager<Position, Velocity, Player>;
 
-	inline lcs::Entity CreatePlayer(ECS& ecs, int x, int y)
+	inline lcs::EntityID CreatePlayer(ECS& ecs, int x, int y)
 	{
 		auto entity = ecs.CreateEntity();
 		ecs.AddComponent<Position>(entity, { x, y });
@@ -44,7 +44,7 @@ static void BenchmarkECS(benchmark::State& state)
 
 	becs::ECS ecs{};
 
-	std::vector<lcs::Entity> players;
+	std::vector<lcs::EntityID> players;
 	std::vector<becs::Position> positions(player_count);
 	std::vector<becs::Velocity> velocities(player_count);
 
@@ -57,7 +57,7 @@ static void BenchmarkECS(benchmark::State& state)
 
 	for (auto _ : state)
 	{
-		for (lcs::Entity e : ecs.GetAllEntitiesWithComponent<becs::Position>())
+		for (lcs::EntityID e : ecs.GetAllEntitiesWithComponent<becs::Position>())
 		{
 			if (ecs.HasComponent<becs::Velocity>(e))
 			{

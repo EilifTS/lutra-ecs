@@ -47,53 +47,32 @@ namespace lcs
 		};
 	}
 
-
-	class Entity
-	{
-	public:
-		inline Entity() : id(invalid_endity_id) {};
-		inline Entity(EntityID id) : id(id) {};
-
-		inline EntityID GetID() const { return id; };
-
-		inline bool IsActive() const { return id != invalid_endity_id; };
-
-	private:
-		static constexpr EntityID invalid_endity_id{ ~(EntityID(0)) };
-
-		EntityID id;
-
-		template <typename... Ts> friend class ECSManager;
-		template <typename T> friend class internal_ecs::EntityComponentIterationHelperIterator;
-		template <typename T> friend class internal_ecs::EntityTagIterationHelperIterator;
-	};
-
 	template <typename... Ts>
 	class ECSManager
 	{
 	public:
 		ECSManager() {};
 
-		inline Entity CreateEntity();
-		inline void DestroyEntity(Entity entity);
+		inline EntityID CreateEntity();
+		inline void DestroyEntity(EntityID entity);
 		inline const IndexFreeList::OccupiedIndicesContainer<false> Entities() { return entity_id_generator.OccupiedIndices(); };
 		inline const IndexFreeList::OccupiedIndicesContainer<true> EntitiesReverse() { return entity_id_generator.OccupiedIndicesReverse(); };
 		inline u32 GetEntityCount();
 
 		/* Component */
-		template <typename T> inline bool HasComponent(Entity entity);
-		template <typename T> inline T& GetComponent(Entity entity);
-		template <typename T> inline std::remove_reference<T>::type& AddComponent(Entity entity, T&& component);
-		template <typename T> inline void RemoveComponent(Entity entity);
+		template <typename T> inline bool HasComponent(EntityID id);
+		template <typename T> inline T& GetComponent(EntityID id);
+		template <typename T> inline std::remove_reference<T>::type& AddComponent(EntityID id, T&& component);
+		template <typename T> inline void RemoveComponent(EntityID id);
 		template <typename T> inline u32 GetComponentCount();
 		template <typename T> inline internal_ecs::EntityComponentIterationHelper<T> GetAllEntitiesWithComponent();
 		template <typename T> inline internal_ecs::EntityComponentIterationHelperReverse<T> GetAllEntitiesWithComponentReverse();
 
 		/* Tag */
 		template <typename T> inline internal_ecs::EntityTagIterationHelper<T> GetAllEntitiesWithTag();
-		template <typename T> inline bool HasTag(Entity entity);
-		template <typename T> inline void AddTag(Entity entity);
-		template <typename T> inline void RemoveTag(Entity entity);
+		template <typename T> inline bool HasTag(EntityID id);
+		template <typename T> inline void AddTag(EntityID id);
+		template <typename T> inline void RemoveTag(EntityID id);
 		/* template <typename T> inline u32 GetTagCount(); */
 
 		inline void Clear();
@@ -110,10 +89,10 @@ namespace lcs
 		class EntityIterationHelperIteratorArrowHelper
 		{
 		public:
-			inline Entity* operator->() { return &entity; };
+			inline EntityID* operator->() { return &entity; };
 		private:
-			inline EntityIterationHelperIteratorArrowHelper(EntityID id) : entity(Entity(id)) {};
-			Entity entity;
+			inline EntityIterationHelperIteratorArrowHelper(EntityID id) : entity(id) {};
+			EntityID entity;
 
 			template <typename T>
 			friend class EntityComponentIterationHelperIterator;
@@ -123,7 +102,7 @@ namespace lcs
 		class EntityComponentIterationHelperIterator
 		{
 		public:
-			inline Entity operator*() const { return Entity(set_iterator.GetOwner()); }
+			inline EntityID operator*() const { return set_iterator.GetOwner(); }
 			inline EntityIterationHelperIteratorArrowHelper operator->() { return EntityIterationHelperIteratorArrowHelper(set_iterator.GetOwner()); }
 
 			/* Prefix increment */
@@ -174,7 +153,7 @@ namespace lcs
 		class EntityTagIterationHelperIterator
 		{
 		public:
-			inline Entity operator*() const { return Entity(*set_iterator); }
+			inline EntityID operator*() const { return *set_iterator; }
 			inline EntityIterationHelperIteratorArrowHelper operator->() { return EntityIterationHelperIteratorArrowHelper(*set_iterator); }
 
 			/* Prefix increment */
@@ -208,21 +187,18 @@ namespace lcs
 	}
 
 	template <typename... Ts>
-	inline Entity ECSManager<Ts...>::CreateEntity()
+	inline EntityID ECSManager<Ts...>::CreateEntity()
 	{
-		return Entity(entity_id_generator.GetNextIndex());
+		return EntityID(entity_id_generator.GetNextIndex());
 	}
 
 	template <typename... Ts>
-	inline void ECSManager<Ts...>::DestroyEntity(Entity entity)
+	inline void ECSManager<Ts...>::DestroyEntity(EntityID id)
 	{
-		const EntityID id = entity.GetID();
-		
 		/* Remove components */
 		( std::get<typename internal_ecs::GetComponentContainer<Ts, Ts::component_type>::Container>(component_sets).RemoveIfPresent(id), ...);
 
 		entity_id_generator.FreeIndex(id);
-		entity.id = Entity::invalid_endity_id;
 	}
 
 	template <typename... Ts>
@@ -232,34 +208,34 @@ namespace lcs
 	}
 
 	template <typename... Ts> template <typename T>
-	inline bool ECSManager<Ts...>::HasComponent(Entity entity)
+	inline bool ECSManager<Ts...>::HasComponent(EntityID id)
 	{
 		SparseSet<T>& set = std::get<SparseSet<T>>(component_sets);
-		return set.Has(entity.id);
+		return set.Has(id);
 	}
 
 	template <typename... Ts> template <typename T>
-	inline T& ECSManager<Ts...>::GetComponent(Entity entity)
+	inline T& ECSManager<Ts...>::GetComponent(EntityID id)
 	{
 		SparseSet<T>& set = std::get<SparseSet<T>>(component_sets);
-		return set.Get(entity.id);
+		return set.Get(id);
 	}
 
 	template <typename... Ts> template <typename T>
-	inline std::remove_reference<T>::type& ECSManager<Ts...>::AddComponent(Entity entity, T&& component)
+	inline std::remove_reference<T>::type& ECSManager<Ts...>::AddComponent(EntityID id, T&& component)
 	{
 		using Tp = std::remove_reference<T>::type;
 		SparseSet<Tp>& set = std::get<SparseSet<Tp>>(component_sets);
-		set.Add(entity.id, std::forward<T>(component));
-		return GetComponent<Tp>(entity);
+		set.Add(id, std::forward<T>(component));
+		return GetComponent<Tp>(id);
 	}
 
 	template <typename... Ts> template <typename T>
-	inline void ECSManager<Ts...>::RemoveComponent(Entity entity)
+	inline void ECSManager<Ts...>::RemoveComponent(EntityID id)
 	{
-		assert(HasComponent<T>(entity));
+		assert(HasComponent<T>(id));
 		SparseSet<T>& set = std::get<SparseSet<T>>(component_sets);
-		return set.Remove(entity.id);
+		return set.Remove(id);
 	}
 
 	template <typename... Ts> template <typename T>
@@ -284,24 +260,24 @@ namespace lcs
 	}
 
 	template <typename... Ts> template <typename T>
-	bool ECSManager<Ts...>::HasTag(Entity entity)
+	bool ECSManager<Ts...>::HasTag(EntityID id)
 	{
 		SparseTagSetT<T>& set = std::get<SparseTagSetT<T>>(component_sets);
-		return set.Has(entity.id);
+		return set.Has(id);
 	}
 
 	template <typename... Ts> template <typename T>
-	void ECSManager<Ts...>::AddTag(Entity entity)
+	void ECSManager<Ts...>::AddTag(EntityID id)
 	{
 		SparseTagSetT<T>& set = std::get<SparseTagSetT<T>>(component_sets);
-		return set.Add(entity.id);
+		return set.Add(id);
 	}
 
 	template <typename... Ts> template <typename T>
-	void ECSManager<Ts...>::RemoveTag(Entity entity)
+	void ECSManager<Ts...>::RemoveTag(EntityID id)
 	{
 		SparseTagSetT<T>& set = std::get<SparseTagSetT<T>>(component_sets);
-		return set.Remove(entity.id);
+		return set.Remove(id);
 	}
 
 	template <typename... Ts> template <typename T>

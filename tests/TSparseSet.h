@@ -7,11 +7,11 @@ TEST(SparseSet, TestInsertHasGet)
 {
 	lcs::SparseSet<u64> set{};
 	set.Add(100, 1);
-	ASSERT_TRUE(set.Size() == 1);
+	ASSERT_TRUE(set.DenseSize() == 1);
 	set.Add(102, 2);
-	ASSERT_TRUE(set.Size() == 2);
+	ASSERT_TRUE(set.DenseSize() == 2);
 	set.Add(50, 3);
-	ASSERT_TRUE(set.Size() == 3);
+	ASSERT_TRUE(set.DenseSize() == 3);
 
 	ASSERT_TRUE(!set.Has(0));
 	ASSERT_TRUE(!set.Has(10));
@@ -31,14 +31,14 @@ TEST(SparseSet, TestRemove)
 {
 	lcs::SparseSet<u64> set{};
 	set.Add(33, 1);
-	ASSERT_TRUE(set.Size() == 1);
+	ASSERT_TRUE(set.DenseSize() == 1);
 	set.Add(44, 2);
-	ASSERT_TRUE(set.Size() == 2);
+	ASSERT_TRUE(set.DenseSize() == 2);
 	set.Add(55, 3);
-	ASSERT_TRUE(set.Size() == 3);
+	ASSERT_TRUE(set.DenseSize() == 3);
 
 	set.Remove(44);
-	ASSERT_TRUE(set.Size() == 2);
+	ASSERT_TRUE(set.DenseSize() == 2);
 	ASSERT_TRUE(!set.Has(43));
 	ASSERT_TRUE(!set.Has(44));
 	ASSERT_TRUE(!set.Has(45));
@@ -63,7 +63,7 @@ TEST(SparseSet, TestInsertRemoveInsert)
 	set.Remove(57);
 	set.Add(33, 100);
 
-	ASSERT_TRUE(set.Size() == 2);
+	ASSERT_TRUE(set.DenseSize() == 2);
 	ASSERT_TRUE(set.Has(55));
 	ASSERT_TRUE(set.Has(33));
 	ASSERT_TRUE(set.Get(33) == 100);
@@ -137,5 +137,5 @@ TEST(SparseSet, TestClearSparse)
 	ASSERT_TRUE(!set.Has(5));
 	ASSERT_TRUE(!set.Has(10));
 	ASSERT_TRUE(!set.Has(15));
-	ASSERT_TRUE(set.Size() == 0);
+	ASSERT_TRUE(set.DenseSize() == 0);
 }

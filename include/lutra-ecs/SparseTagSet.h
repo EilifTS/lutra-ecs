@@ -19,7 +19,8 @@ namespace lcs
 		inline void RemoveIfPresent(u32 index);
 		inline bool Has(u32 index) const;
 
-		inline u32 Size() const { return denseSize(); };
+		inline u32 SparseSize() const { return (u32)sparse_indices.size(); };
+		inline u32 DenseSize() const { return (u32)inverse_list.size(); };
 
 		inline void Clear();
 
@@ -32,8 +33,6 @@ namespace lcs
 	private:
 		constexpr static u32 invalid_index{ u32(-1) };
 
-		inline u32 sparseSize() const { return (u32)sparse_indices.size(); };
-		inline u32 denseSize() const { return (u32)inverse_list.size(); };
 		inline bool isValidInputIndex(u32 index) const;
 		inline void inflateSparseSet(u32 new_size);
 
@@ -50,14 +49,14 @@ namespace lcs
 
 	void SparseTagSet::Add(u32 index)
 	{
-		if (index >= sparseSize())
+		if (index >= SparseSize())
 		{
 			inflateSparseSet(index + 1);
 		}
 		assert(sparse_indices[index] == invalid_index);
 
 		inverse_list.push_back(index);
-		sparse_indices[index] = denseSize() - 1;
+		sparse_indices[index] = DenseSize() - 1;
 	}
 
 	void SparseTagSet::Remove(u32 index)
@@ -84,7 +83,7 @@ namespace lcs
 
 	bool SparseTagSet::Has(u32 index) const
 	{
-		if (index >= sparseSize()) return false;
+		if (index >= SparseSize()) return false;
 		if (sparse_indices[index] == invalid_index) return false;
 		return true;
 	}
@@ -97,16 +96,16 @@ namespace lcs
 
 	bool SparseTagSet::isValidInputIndex(u32 index) const
 	{
-		if (index >= sparseSize()) return false;
+		if (index >= SparseSize()) return false;
 		if (sparse_indices[index] == invalid_index) return false;
-		if (sparse_indices[index] >= denseSize()) return false;
+		if (sparse_indices[index] >= DenseSize()) return false;
 		return true;
 	}
 
 	void SparseTagSet::inflateSparseSet(u32 new_size)
 	{
-		assert(new_size > sparseSize());
-		while (sparseSize() < new_size)
+		assert(new_size > SparseSize());
+		while (SparseSize() < new_size)
 		{
 			sparse_indices.push_back(invalid_index);
 		}

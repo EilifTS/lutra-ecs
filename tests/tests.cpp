@@ -1,8 +1,9 @@
 #include <gtest/gtest.h>
 
 #include "TECS.h"
-#include "TSparseSet.h"
 #include "TIndexFreeList.h"
+#include "TSparseSet.h"
+#include "TSparseTagSet.h"
 
 int main(int argc, char** argv)
 {

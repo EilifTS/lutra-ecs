@@ -108,7 +108,6 @@ static void BenchmarkECSSTD(benchmark::State& state)
 				p.x += v.x;
 				p.y += v.y;
 			}
-
 		}
 	}
 	ecs.Clear();

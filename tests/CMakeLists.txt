@@ -2,6 +2,7 @@ file(GLOB TEST_INCLUDES
     TECS.h
     TIndexFreeList.h
     TSparseSet.h
+    TSparsTageSet.h
 )
 
 file(GLOB TEST_SOURCES

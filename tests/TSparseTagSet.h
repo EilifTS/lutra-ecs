@@ -47,7 +47,7 @@ TEST(SparseTagSet, Remove)
 TEST(SparseTagSet, InsertRemoveInsert)
 {
 	lcs::SparseTagSet set{ };
-	set.ReserveSparseSize(56);
+	set.ReserveSparseSize(58);
 
 	set.Add(33);
 	set.Add(44);

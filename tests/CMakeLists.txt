@@ -1,6 +1,6 @@
 file(GLOB TEST_INCLUDES
     TECS.h
-    TEntityIDGenerator.h
+    TIndexFreeList.h
     TSparseSet.h
 )
 

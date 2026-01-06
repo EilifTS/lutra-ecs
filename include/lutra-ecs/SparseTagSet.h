@@ -1,8 +1,10 @@
 #pragma once
-#include <lutra-ecs/Entity.h>
 #include <vector>
 #include <algorithm>
+#include <cinttypes>
 #include <assert.h>
+
+using u32 = uint32_t;
 
 namespace lcs
 {
@@ -11,60 +13,59 @@ namespace lcs
 	public:
 		inline SparseTagSet() {};
 
-		inline void Add(EntityID id);
+		inline void Add(u32 index);
 
-		inline void Remove(EntityID id);
-		inline void RemoveIfPresent(EntityID id);
-		inline bool Has(EntityID id) const;
+		inline void Remove(u32 index);
+		inline void RemoveIfPresent(u32 index);
+		inline bool Has(u32 index) const;
 
-		inline uint32_t Size() const { return denseSize(); };
+		inline u32 Size() const { return denseSize(); };
 
 		inline void Clear();
 
-		using Iterator = std::vector<EntityID>::iterator;
+		using Iterator = std::vector<u32>::iterator;
 		
 		inline Iterator begin() { return inverse_list.begin(); };
 
 		inline Iterator end() { return inverse_list.end(); };
 
 	private:
-		constexpr static uint32_t invalid_index{ uint32_t(-1) };
+		constexpr static u32 invalid_index{ u32(-1) };
 
-		inline uint32_t sparseSize() const { return uint32_t(sparse_indices.size()); };
-		inline uint32_t denseSize() const { return uint32_t(inverse_list.size()); };
-		inline bool isValidInputIndex(EntityID id) const;
-		inline void inflateSparseSet(uint32_t new_size);
+		inline u32 sparseSize() const { return (u32)sparse_indices.size(); };
+		inline u32 denseSize() const { return (u32)inverse_list.size(); };
+		inline bool isValidInputIndex(u32 index) const;
+		inline void inflateSparseSet(u32 new_size);
 
-		std::vector<uint32_t> sparse_indices;
-		std::vector<EntityID> inverse_list;
+		std::vector<u32> sparse_indices;
+		std::vector<u32> inverse_list;
 	};
 
 	/* Templated version for specific tags */
-	/* TODO: Should be possible to remove this */
 	template <typename T>
 	class SparseTagSetT : public SparseTagSet
 	{
 
 	};
 
-	void SparseTagSet::Add(EntityID id)
+	void SparseTagSet::Add(u32 index)
 	{
-		if (id >= sparseSize())
+		if (index >= sparseSize())
 		{
-			inflateSparseSet(id + 1);
+			inflateSparseSet(index + 1);
 		}
-		assert(sparse_indices[id] == invalid_index);
+		assert(sparse_indices[index] == invalid_index);
 
-		inverse_list.push_back(id);
-		sparse_indices[id] = denseSize() - 1;
+		inverse_list.push_back(index);
+		sparse_indices[index] = denseSize() - 1;
 	}
 
-	void SparseTagSet::Remove(EntityID id)
+	void SparseTagSet::Remove(u32 index)
 	{
-		assert(isValidInputIndex(id));
-		uint32_t back_index = inverse_list.back();
-		uint32_t dense_index = sparse_indices[id];
-		uint32_t dense_back_index = sparse_indices[back_index];
+		assert(isValidInputIndex(index));
+		u32 back_index = inverse_list.back();
+		u32 dense_index = sparse_indices[index];
+		u32 dense_back_index = sparse_indices[back_index];
 
 		if (dense_back_index != dense_index)
 		{
@@ -73,18 +74,18 @@ namespace lcs
 		inverse_list.pop_back();
 
 		sparse_indices[back_index] = dense_index;
-		sparse_indices[id] = invalid_index;
+		sparse_indices[index] = invalid_index;
 	}
 
-	void SparseTagSet::RemoveIfPresent(EntityID id)
+	void SparseTagSet::RemoveIfPresent(u32 index)
 	{
-		if (Has(id)) Remove(id);
+		if (Has(index)) Remove(index);
 	}
 
-	bool SparseTagSet::Has(EntityID id) const
+	bool SparseTagSet::Has(u32 index) const
 	{
-		if (id >= sparseSize()) return false;
-		if (sparse_indices[id] == invalid_index) return false;
+		if (index >= sparseSize()) return false;
+		if (sparse_indices[index] == invalid_index) return false;
 		return true;
 	}
 
@@ -94,15 +95,15 @@ namespace lcs
 		inverse_list.clear();
 	}
 
-	bool SparseTagSet::isValidInputIndex(EntityID id) const
+	bool SparseTagSet::isValidInputIndex(u32 index) const
 	{
-		if (id >= sparseSize()) return false;
-		if (sparse_indices[id] == invalid_index) return false;
-		if (sparse_indices[id] >= denseSize()) return false;
+		if (index >= sparseSize()) return false;
+		if (sparse_indices[index] == invalid_index) return false;
+		if (sparse_indices[index] >= denseSize()) return false;
 		return true;
 	}
 
-	void SparseTagSet::inflateSparseSet(uint32_t new_size)
+	void SparseTagSet::inflateSparseSet(u32 new_size)
 	{
 		assert(new_size > sparseSize());
 		while (sparseSize() < new_size)

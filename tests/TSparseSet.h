@@ -1,10 +1,11 @@
 #include <gtest/gtest.h>
 
 #include <lutra-ecs/SparseSet.h>
+using u64 = uint64_t;
 
 TEST(SparseSet, TestInsertHasGet)
 {
-	lcs::SparseSet<uint64_t> set{};
+	lcs::SparseSet<u64> set{};
 	set.Add(100, 1);
 	ASSERT_TRUE(set.Size() == 1);
 	set.Add(102, 2);
@@ -28,7 +29,7 @@ TEST(SparseSet, TestInsertHasGet)
 
 TEST(SparseSet, TestRemove)
 {
-	lcs::SparseSet<uint64_t> set{};
+	lcs::SparseSet<u64> set{};
 	set.Add(33, 1);
 	ASSERT_TRUE(set.Size() == 1);
 	set.Add(44, 2);
@@ -48,7 +49,7 @@ TEST(SparseSet, TestRemove)
 
 TEST(SparseSet, TestInsertRemoveInsert)
 {
-	lcs::SparseSet<uint64_t> set{};
+	lcs::SparseSet<u64> set{};
 	set.Add(33, 1);
 	set.Add(44, 2);
 	set.Add(55, 3);
@@ -75,7 +76,7 @@ TEST(SparseSet, TestInsertRemoveInsert)
 
 TEST(SparseSet, TestInsertRemoveInsert2)
 {
-	lcs::SparseSet<uint64_t> set{};
+	lcs::SparseSet<u64> set{};
 	set.Add(0, 0);
 	set.Add(1, 1);
 	set.Remove(1);
@@ -92,13 +93,13 @@ TEST(SparseSet, TestInsertRemoveInsert2)
 
 TEST(SparseSet, TestIteration)
 {
-	lcs::SparseSet<uint64_t> set{};
+	lcs::SparseSet<u64> set{};
 	set.Add(5, 1);
 	set.Add(10, 2);
 	set.Add(15, 3);
 
-	uint32_t index_sum = 0;
-	uint64_t data_sum = 0;
+	u32 index_sum = 0;
+	u64 data_sum = 0;
 	for (auto it = set.begin(); it != set.end(); ++it)
 	{
 		index_sum += it.GetOwner();
@@ -110,12 +111,12 @@ TEST(SparseSet, TestIteration)
 
 TEST(SparseSet, TestIterationReverse)
 {
-	lcs::SparseSet<uint64_t> set{};
+	lcs::SparseSet<u64> set{};
 	set.Add(5, 1);
 	set.Add(10, 2);
 	set.Add(15, 3);
 
-	std::vector<uint64_t> values{};
+	std::vector<u64> values{};
 	for (auto it = set.rbegin(); it != set.rend(); ++it)
 	{
 		values.push_back(*it);
@@ -127,7 +128,7 @@ TEST(SparseSet, TestIterationReverse)
 
 TEST(SparseSet, TestClearSparse)
 {
-	lcs::SparseSet<uint64_t> set{};
+	lcs::SparseSet<u64> set{};
 	set.Add(5, 1);
 	set.Add(10, 2);
 	set.Add(15, 3);

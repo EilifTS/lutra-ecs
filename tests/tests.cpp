@@ -2,7 +2,7 @@
 
 #include "TECS.h"
 #include "TSparseSet.h"
-#include "TIndexFreeList.h"
+#include "TEntityIDGenerator.h"
 
 int main(int argc, char** argv)
 {

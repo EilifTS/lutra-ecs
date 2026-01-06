@@ -1,20 +1,16 @@
 #pragma once
 #include <lutra-ecs/SparseSet.h>
-#include <lutra-ecs/IndexFreeList.h>
+#include <lutra-ecs/EntityIDGenerator.h>
 #include <lutra-ecs/SparseTagSet.h>
+#include <lutra-ecs/Entity.h>
 #include <algorithm>
 #include <array>
 #include <type_traits>
 #include <vector>
-#include <cinttypes>
 
 namespace lcs
 {
-	using u32 = uint32_t;
-
 	template <typename... Ts> class ECSManager;
-	class Entity;
-	using EntityID = u32;
 
 	enum class ComponentType
 	{
@@ -55,16 +51,16 @@ namespace lcs
 
 		inline EntityID CreateEntity();
 		inline void DestroyEntity(EntityID entity);
-		inline const IndexFreeList::OccupiedIndicesContainer<false> Entities() { return entity_id_generator.OccupiedIndices(); };
-		inline const IndexFreeList::OccupiedIndicesContainer<true> EntitiesReverse() { return entity_id_generator.OccupiedIndicesReverse(); };
-		inline u32 GetEntityCount();
+		inline const EntityIDGenerator::OccupiedIndicesContainer<false> Entities() { return entity_id_generator.OccupiedIndices(); };
+		inline const EntityIDGenerator::OccupiedIndicesContainer<true> EntitiesReverse() { return entity_id_generator.OccupiedIndicesReverse(); };
+		inline uint32_t GetEntityCount();
 
 		/* Component */
 		template <typename T> inline bool HasComponent(EntityID id);
 		template <typename T> inline T& GetComponent(EntityID id);
 		template <typename T> inline std::remove_reference<T>::type& AddComponent(EntityID id, T&& component);
 		template <typename T> inline void RemoveComponent(EntityID id);
-		template <typename T> inline u32 GetComponentCount();
+		template <typename T> inline uint32_t GetComponentCount();
 		template <typename T> inline internal_ecs::EntityComponentIterationHelper<T> GetAllEntitiesWithComponent();
 		template <typename T> inline internal_ecs::EntityComponentIterationHelperReverse<T> GetAllEntitiesWithComponentReverse();
 
@@ -78,7 +74,7 @@ namespace lcs
 		inline void Clear();
 
 	private:
-		IndexFreeList entity_id_generator{};
+		EntityIDGenerator entity_id_generator{};
 		std::tuple<typename internal_ecs::GetComponentContainer<Ts, Ts::component_type>::Container... > component_sets{};
 
 		friend class Entity;
@@ -189,7 +185,7 @@ namespace lcs
 	template <typename... Ts>
 	inline EntityID ECSManager<Ts...>::CreateEntity()
 	{
-		return EntityID(entity_id_generator.GetNextIndex());
+		return entity_id_generator.GetNextEntityID();
 	}
 
 	template <typename... Ts>
@@ -198,11 +194,11 @@ namespace lcs
 		/* Remove components */
 		( std::get<typename internal_ecs::GetComponentContainer<Ts, Ts::component_type>::Container>(component_sets).RemoveIfPresent(id), ...);
 
-		entity_id_generator.FreeIndex(id);
+		entity_id_generator.FreeEntityID(id);
 	}
 
 	template <typename... Ts>
-	inline u32 ECSManager<Ts...>::GetEntityCount()
+	inline uint32_t ECSManager<Ts...>::GetEntityCount()
 	{
 		return entity_id_generator.UsedIndexCount();
 	}
@@ -239,7 +235,7 @@ namespace lcs
 	}
 
 	template <typename... Ts> template <typename T>
-	inline u32 ECSManager<Ts...>::GetComponentCount()
+	inline uint32_t ECSManager<Ts...>::GetComponentCount()
 	{
 		SparseSet<T>& set = std::get<SparseSet<T>>(component_sets);
 		return set.Size();

@@ -1,9 +1,7 @@
 #pragma once
+#include <lutra-ecs/Entity.h>
 #include <algorithm>
 #include <vector>
-#include <cinttypes>
-
-using u32 = uint32_t;
 
 namespace lcs
 {
@@ -13,17 +11,17 @@ namespace lcs
 	public:
 		SparseSet() {};
 
-		inline void Add(u32 index, T&& data);
+		inline void Add(EntityID id, T&& data);
 
-		inline T& Get(u32 index);
+		inline T& Get(EntityID id);
 
-		inline const T& Get(u32 index) const { return Get(index); };
+		inline const T& Get(EntityID id) const { return Get(id); };
 
-		inline void Remove(u32 index);
-		inline void RemoveIfPresent(u32 index);
-		inline bool Has(u32 index) const;
+		inline void Remove(EntityID id);
+		inline void RemoveIfPresent(EntityID id);
+		inline bool Has(EntityID id) const;
 
-		inline u32 Size() const { return denseSize(); };
+		inline uint32_t Size() const { return denseSize(); };
 
 		inline void Clear();
 
@@ -36,7 +34,7 @@ namespace lcs
 			inline IteratorType& operator*() const { return owner.dense_data[dense_index]; }
 			inline IteratorType* operator->() { return &(owner.dense_data[dense_index]); }
 
-			inline u32 GetOwner() const { return owner.inverse_list[dense_index]; };
+			inline EntityID GetOwner() const { return owner.inverse_list[dense_index]; };
 
 			inline IteratorInternal& operator++()
 			{
@@ -60,8 +58,8 @@ namespace lcs
 			friend bool operator== (const IteratorInternal& a, const IteratorInternal& b) { return a.dense_index == b.dense_index; };
 			friend bool operator!= (const IteratorInternal& a, const IteratorInternal& b) { return a.dense_index != b.dense_index; };
 		private:
-			inline IteratorInternal(SparseSet& owner, u32 dense_index) : dense_index(dense_index), owner(owner) {}
-			u32 dense_index;
+			inline IteratorInternal(SparseSet& owner, uint32_t dense_index) : dense_index(dense_index), owner(owner) {}
+			uint32_t dense_index;
 			SparseSet& owner;
 
 			friend class SparseSet;
@@ -79,46 +77,46 @@ namespace lcs
 		inline RIterator rend() { return RIterator(*this, -1); };
 
 	private:
-		constexpr static u32 invalid_index{ u32(-1) };
+		constexpr static uint32_t invalid_index{ uint32_t(-1) };
 
-		inline u32 sparseSize() const { return u32(sparse_indices.size()); };
-		inline u32 denseSize() const { return u32(dense_data.size()); };
-		inline bool isValidInputIndex(u32 index) const;
-		inline void inflateSparseSet(u32 new_size);
+		inline uint32_t sparseSize() const { return uint32_t(sparse_indices.size()); };
+		inline uint32_t denseSize() const { return uint32_t(dense_data.size()); };
+		inline bool isValidInputIndex(EntityID id) const;
+		inline void inflateSparseSet(size_t new_size);
 
-		std::vector<u32> sparse_indices;
-		std::vector<u32> inverse_list;
+		std::vector<uint32_t> sparse_indices;
+		std::vector<EntityID> inverse_list;
 		std::vector<T> dense_data;
 	};
 
 	template <typename T>
-	void SparseSet<T>::Add(u32 index, T&& data)
+	void SparseSet<T>::Add(EntityID id, T&& data)
 	{
-		if (index >= sparseSize())
+		if (id >= sparseSize())
 		{
-			inflateSparseSet(index + 1);
+			inflateSparseSet(id + 1);
 		}
-		assert(sparse_indices[index] == invalid_index);
+		assert(sparse_indices[id] == invalid_index);
 
 		dense_data.push_back(data);
-		inverse_list.push_back(index);
-		sparse_indices[index] = denseSize() - 1;
+		inverse_list.push_back(id);
+		sparse_indices[id] = denseSize() - 1;
 	}
 
 	template <typename T>
-	T& SparseSet<T>::Get(u32 index)
+	T& SparseSet<T>::Get(EntityID id)
 	{
-		assert(isValidInputIndex(index));
-		return dense_data[sparse_indices[index]];
+		assert(isValidInputIndex(id));
+		return dense_data[sparse_indices[id]];
 	}
 
 	template <typename T>
-	void SparseSet<T>::Remove(u32 index)
+	void SparseSet<T>::Remove(EntityID id)
 	{
-		assert(isValidInputIndex(index));
-		u32 back_index = inverse_list.back();
-		u32 dense_index = sparse_indices[index];
-		u32 dense_back_index = sparse_indices[back_index];
+		assert(isValidInputIndex(id));
+		uint32_t back_index = inverse_list.back();
+		uint32_t dense_index = sparse_indices[id];
+		uint32_t dense_back_index = sparse_indices[back_index];
 
 		if (dense_back_index != dense_index)
 		{
@@ -129,20 +127,20 @@ namespace lcs
 		inverse_list.pop_back();
 
 		sparse_indices[back_index] = dense_index;
-		sparse_indices[index] = invalid_index;
+		sparse_indices[id] = invalid_index;
 	}
 
 	template <typename T>
-	void SparseSet<T>::RemoveIfPresent(u32 index)
+	void SparseSet<T>::RemoveIfPresent(EntityID id)
 	{
-		if (Has(index)) Remove(index);
+		if (Has(id)) Remove(id);
 	}
 
 	template <typename T>
-	bool SparseSet<T>::Has(u32 index) const
+	bool SparseSet<T>::Has(EntityID id) const
 	{
-		if (index >= sparseSize()) return false;
-		if (sparse_indices[index] == invalid_index) return false;
+		if (id >= sparseSize()) return false;
+		if (sparse_indices[id] == invalid_index) return false;
 		return true;
 	}
 
@@ -155,16 +153,16 @@ namespace lcs
 	}
 
 	template <typename T>
-	bool SparseSet<T>::isValidInputIndex(u32 index) const
+	bool SparseSet<T>::isValidInputIndex(EntityID id) const
 	{
-		if (index >= sparseSize()) return false;
-		if (sparse_indices[index] == invalid_index) return false;
-		if (sparse_indices[index] >= denseSize()) return false;
+		if (id >= sparseSize()) return false;
+		if (sparse_indices[id] == invalid_index) return false;
+		if (sparse_indices[id] >= denseSize()) return false;
 		return true;
 	}
 
 	template <typename T>
-	void SparseSet<T>::inflateSparseSet(u32 new_size)
+	void SparseSet<T>::inflateSparseSet(size_t new_size)
 	{
 		assert(new_size > sparseSize());
 		while (sparseSize() < new_size)

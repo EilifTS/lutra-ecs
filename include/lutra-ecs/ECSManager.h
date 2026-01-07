@@ -186,6 +186,9 @@ namespace lcs
 	{
 		(std::get<typename internal_ecs::GetComponentContainer<Ts, Ts::component_type>::Container>(component_sets).Clear(), ...);
 		entity_id_generator.Clear();
+
+		reserved_component_count = 8;
+		reserveComponentStorage(reserved_component_count);
 	}
 
 	template <typename... Ts>

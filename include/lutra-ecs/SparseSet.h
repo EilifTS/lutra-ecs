@@ -1,8 +1,9 @@
 #pragma once
 #include <algorithm>
-#include <vector>
 #include <cinttypes>
+#include <cassert>
 #include <utility>
+#include <vector>
 
 using u32 = uint32_t;
 

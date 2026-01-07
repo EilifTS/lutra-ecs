@@ -293,3 +293,23 @@ TEST(ECS, TestDualManager)
 	ASSERT_TRUE(!ecs2.HasComponent<TECS::Position>(e1_ecs2));
 	ASSERT_TRUE(ecs2.GetComponent<TECS::Position>(e2_ecs2).x == 2 && ecs2.GetComponent<TECS::Position>(e2_ecs2).y == 2);
 }
+
+TEST(ECS, TestUseAfterClear)
+{
+	TECS::ECS ecs{ };
+	ecs.Clear();
+
+	constexpr int player_pos_x{ 2 };
+	constexpr int player_pos_y{ 1 };
+
+	lcs::EntityID e = TECS::CreatePlayer(ecs, player_pos_x, player_pos_y);
+	ASSERT_TRUE(ecs.HasComponent<TECS::Position>(e));
+	ASSERT_TRUE(ecs.HasComponent<TECS::Velocity>(e));
+	ASSERT_TRUE(ecs.HasComponent<TECS::Player>(e));
+	ASSERT_TRUE(!ecs.HasComponent<TECS::Enemy>(e));
+	ASSERT_TRUE(!ecs.HasComponent<TECS::Weapon>(e));
+
+	ASSERT_TRUE(ecs.GetComponent<TECS::Position>(e).x == player_pos_x);
+	ASSERT_TRUE(ecs.GetComponent<TECS::Position>(e).y == player_pos_y);
+
+}

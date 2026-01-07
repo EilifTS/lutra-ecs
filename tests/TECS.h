@@ -192,9 +192,9 @@ TEST(ECS, TestSparseIteration)
 	{
 		entities.push_back(TECS::CreatePlayer(ecs, player_pos_x + i, player_pos_y));
 	}
-	for (lcs::EntityID e : ecs.GetAllEntitiesWithComponent<TECS::Position>())
+	for (auto [e, p] : ecs.CView<TECS::Position>())
 	{
-		ecs.GetComponent<TECS::Position>(e).x++;
+		p.x++;
 	}
 
 	for (int i = 0; i < 100; i++)
@@ -257,7 +257,7 @@ TEST(ECS, TestTagCreation)
 	ecs.AddTag<TECS::IsWet>(e4);
 
 	std::vector<lcs::EntityID> tagged_entities{};
-	for (auto e : ecs.GetAllEntitiesWithTag<TECS::IsWet>())
+	for (auto e : ecs.TView<TECS::IsWet>())
 	{
 		tagged_entities.push_back(e);
 	}

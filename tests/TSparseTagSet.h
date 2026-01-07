@@ -1,3 +1,5 @@
+#include <gtest/gtest.h>
+
 #include <lutra-ecs/SparseTagSet.h>
 
 TEST(SparseTagSet, InsertHasGet)

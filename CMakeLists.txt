@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.28)
+cmake_minimum_required (VERSION 3.16)
 project(lutra-ecs LANGUAGES CXX)
 
 option(LUTRA_ECS_BUILD_BENCHMARKS "Build benchmarks" ON)

@@ -8,6 +8,7 @@
 #include <array>
 #include <type_traits>
 #include <vector>
+#include <tuple>
 
 namespace lcs
 {
@@ -56,12 +57,14 @@ namespace lcs
 		template <typename T> inline u32 GetComponentCount();
 		template <typename T> inline internal_ecs::EntityComponentIterationHelper<T> GetAllEntitiesWithComponent();
 		template <typename T> inline internal_ecs::EntityComponentIterationHelperReverse<T> GetAllEntitiesWithComponentReverse();
+		template <typename T> inline ComponentView<T> CView();
 
 		/* Tag */
-		template <typename T> inline internal_ecs::EntityTagIterationHelper<T> GetAllEntitiesWithTag();
 		template <typename T> inline bool HasTag(EntityID id);
 		template <typename T> inline void AddTag(EntityID id);
 		template <typename T> inline void RemoveTag(EntityID id);
+		template <typename T> inline internal_ecs::EntityTagIterationHelper<T> GetAllEntitiesWithTag();
+		template <typename T> inline TagView<T> TView();
 		/* template <typename T> inline u32 GetTagCount(); */
 
 		inline void Clear();
@@ -154,6 +157,13 @@ namespace lcs
 	}
 
 	template <typename... Ts> template <typename T>
+	inline ComponentView<T> ECSManager<Ts...>::CView()
+	{
+		SparseSet<T>& set = std::get<SparseSet<T>>(component_sets);
+		return ComponentView<T>(set);
+	}
+
+	template <typename... Ts> template <typename T>
 	bool ECSManager<Ts...>::HasTag(EntityID id)
 	{
 		SparseTagSetT<T>& set = std::get<SparseTagSetT<T>>(component_sets);
@@ -179,6 +189,13 @@ namespace lcs
 	{
 		SparseTagSetT<T>& set = std::get<SparseTagSetT<T>>(component_sets);
 		return internal_ecs::EntityTagIterationHelper<T>(set);
+	}
+
+	template <typename... Ts> template <typename T>
+	inline TagView<T> ECSManager<Ts...>::TView()
+	{
+		SparseTagSetT<T>& set = std::get<SparseTagSetT<T>>(component_sets);
+		return TagView<T>(set);
 	}
 
 	/*template <typename... Ts, typename T>

@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <vector>
 #include <cinttypes>
+#include <utility>
 
 using u32 = uint32_t;
 
@@ -96,7 +97,7 @@ namespace lcs
 		assert(index < SparseSize()); /* Invalid index or missing reservation */
 		assert(sparse_indices[index] == invalid_index);
 
-		dense_data.push_back(data);
+		dense_data.emplace_back(data);
 		inverse_list.push_back(index);
 		sparse_indices[index] = DenseSize() - 1;
 	}

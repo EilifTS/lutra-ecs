@@ -51,8 +51,8 @@ namespace lcs
 		private:
 			EntityComponentIterationHelperIterator(const T& creator) : set_iterator(creator) {};
 			T set_iterator;
-			friend EntityComponentIterationHelper<typename T::IteratorType>;
-			friend EntityComponentIterationHelperReverse<typename T::IteratorType>;
+			friend EntityComponentIterationHelper<typename T::value_type>;
+			friend EntityComponentIterationHelperReverse<typename T::value_type>;
 		};
 
 		template <typename T>

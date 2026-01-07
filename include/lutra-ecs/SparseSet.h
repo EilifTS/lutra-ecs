@@ -30,56 +30,51 @@ namespace lcs
 		inline void ReserveSparseSize(u32 new_size);
 		inline void Clear();
 
-		template <bool reverse>
-		class IteratorInternal
+		class Iterator
 		{
 		public:
-			using IteratorType = T;
+			using iterator_category = std::bidirectional_iterator_tag;
+			using value_type = T;
+			using difference_type = std::ptrdiff_t;
+			using pointer = T*;
+			using reference = T&;
 
-			inline IteratorType& operator*() const { return owner.dense_data[dense_index]; }
-			inline IteratorType* operator->() { return &(owner.dense_data[dense_index]); }
+			inline T& operator*() const { return owner.dense_data[dense_index]; }
+			inline T* operator->() { return &(owner.dense_data[dense_index]); }
 
 			inline u32 GetOwner() const { return owner.inverse_list[dense_index]; };
 
-			inline IteratorInternal& operator++()
+			inline Iterator& operator++() { dense_index++; return *this; }
+			inline Iterator& operator--() { dense_index--; return *this; }
+
+			inline Iterator operator++(int)
 			{
-				if constexpr (!reverse)
-				{
-					/* Normal */
-					dense_index++; return *this;
-				}
-				else
-				{
-					/* Reverse */
-					dense_index--; return *this;
-				}
+				Iterator tmp = *this; ++(*this); return tmp;
+			}
+			inline Iterator operator--(int)
+			{
+				Iterator tmp = *this; --(*this); return tmp;
 			}
 
-			inline IteratorInternal operator++(int)
-			{
-				IteratorInternal tmp = *this; ++(*this); return tmp;
-			}
-
-			friend bool operator== (const IteratorInternal& a, const IteratorInternal& b) { return a.dense_index == b.dense_index; };
-			friend bool operator!= (const IteratorInternal& a, const IteratorInternal& b) { return a.dense_index != b.dense_index; };
+			friend bool operator== (const Iterator& a, const Iterator& b) { return a.dense_index == b.dense_index; };
+			friend bool operator!= (const Iterator& a, const Iterator& b) { return a.dense_index != b.dense_index; };
 		private:
-			inline IteratorInternal(SparseSet& owner, u32 dense_index) : dense_index(dense_index), owner(owner) {}
+			inline Iterator(SparseSet& owner, u32 dense_index) : dense_index(dense_index), owner(owner) {}
 			u32 dense_index;
 			SparseSet& owner;
 
 			friend class SparseSet;
 		};
 
-		using Iterator = IteratorInternal<false>;
-		using RIterator = IteratorInternal<true>;
+		using RIterator = std::reverse_iterator<Iterator>;
 
 		inline Iterator begin() { return Iterator(*this, 0); };
 
 		inline Iterator end() { return Iterator(*this, DenseSize()); };
 
-		inline RIterator rbegin() { return RIterator(*this, DenseSize() - 1); };
+		inline RIterator rbegin() { return RIterator(Iterator(*this, DenseSize())); };
 
-		inline RIterator rend() { return RIterator(*this, -1); };
+		inline RIterator rend() { return RIterator(Iterator(*this, 0)); };
 
 	private:
 		constexpr static u32 invalid_index{ u32(-1) };

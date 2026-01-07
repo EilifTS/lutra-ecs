@@ -2,7 +2,7 @@
 #include <lutra-ecs/SparseSet.h>
 #include <lutra-ecs/IndexFreeList.h>
 #include <lutra-ecs/SparseTagSet.h>
-#include <lutra-ecs/IterationHelpers.h>
+#include <lutra-ecs/Views.h>
 #include <lutra-ecs/EntityID.h>
 #include <algorithm>
 #include <array>
@@ -55,15 +55,12 @@ namespace lcs
 		template <typename T> inline std::remove_reference<T>::type& AddComponent(EntityID id, T&& component);
 		template <typename T> inline void RemoveComponent(EntityID id);
 		template <typename T> inline u32 GetComponentCount();
-		template <typename T> inline internal_ecs::EntityComponentIterationHelper<T> GetAllEntitiesWithComponent();
-		template <typename T> inline internal_ecs::EntityComponentIterationHelperReverse<T> GetAllEntitiesWithComponentReverse();
 		template <typename T> inline ComponentView<T> CView();
 
 		/* Tag */
 		template <typename T> inline bool HasTag(EntityID id);
 		template <typename T> inline void AddTag(EntityID id);
 		template <typename T> inline void RemoveTag(EntityID id);
-		template <typename T> inline internal_ecs::EntityTagIterationHelper<T> GetAllEntitiesWithTag();
 		template <typename T> inline TagView<T> TView();
 		/* template <typename T> inline u32 GetTagCount(); */
 
@@ -143,20 +140,6 @@ namespace lcs
 	}
 
 	template <typename... Ts> template <typename T>
-	inline internal_ecs::EntityComponentIterationHelper<T> ECSManager<Ts...>::GetAllEntitiesWithComponent()
-	{
-		SparseSet<T>& set = std::get<SparseSet<T>>(component_sets);
-		return internal_ecs::EntityComponentIterationHelper<T>(set);
-	}
-
-	template <typename... Ts> template <typename T>
-	inline internal_ecs::EntityComponentIterationHelperReverse<T> ECSManager<Ts...>::GetAllEntitiesWithComponentReverse()
-	{
-		SparseSet<T>& set = std::get<SparseSet<T>>(component_sets);
-		return internal_ecs::EntityComponentIterationHelperReverse<T>(set);
-	}
-
-	template <typename... Ts> template <typename T>
 	inline ComponentView<T> ECSManager<Ts...>::CView()
 	{
 		SparseSet<T>& set = std::get<SparseSet<T>>(component_sets);
@@ -182,13 +165,6 @@ namespace lcs
 	{
 		SparseTagSetT<T>& set = std::get<SparseTagSetT<T>>(component_sets);
 		return set.Remove(id);
-	}
-
-	template <typename... Ts> template <typename T>
-	internal_ecs::EntityTagIterationHelper<T> ECSManager<Ts...>::GetAllEntitiesWithTag()
-	{
-		SparseTagSetT<T>& set = std::get<SparseTagSetT<T>>(component_sets);
-		return internal_ecs::EntityTagIterationHelper<T>(set);
 	}
 
 	template <typename... Ts> template <typename T>

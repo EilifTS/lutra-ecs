@@ -58,11 +58,10 @@ namespace TECS
 
 	static void UpdateSystem(ECS& ecs)
 	{
-		for (auto e : ecs.GetAllEntitiesWithComponent<Position>())
+		for (auto [e, p] : ecs.CView<Position>())
 		{
 			if (ecs.HasComponent<Velocity>(e))
 			{
-				Position& p = ecs.GetComponent<Position>(e);
 				Velocity& v = ecs.GetComponent<Velocity>(e);
 				p.x += v.x;
 				p.y += v.y;

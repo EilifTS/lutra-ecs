@@ -57,40 +57,6 @@ static void BenchmarkECS(benchmark::State& state)
 
 	for (auto _ : state)
 	{
-		for (lcs::EntityID e : ecs.GetAllEntitiesWithComponent<becs::Position>())
-		{
-			if (ecs.HasComponent<becs::Velocity>(e))
-			{
-				becs::Position& p = ecs.GetComponent<becs::Position>(e);
-				becs::Velocity& v = ecs.GetComponent<becs::Velocity>(e);
-				p.x += v.x;
-				p.y += v.y;
-			}
-		}
-	}
-
-	ecs.Clear();
-}
-
-static void BenchmarkECSView(benchmark::State& state)
-{
-	const u32 player_count = state.range(0);
-
-	becs::ECS ecs{};
-
-	std::vector<lcs::EntityID> players;
-	std::vector<becs::Position> positions(player_count);
-	std::vector<becs::Velocity> velocities(player_count);
-
-	for (u32 i = 0; i < player_count; i++)
-	{
-		players.push_back(becs::CreatePlayer(ecs, 1, i));
-		positions[i] = { 1, (int)i };
-		velocities[i] = { 0, 1 };
-	}
-
-	for (auto _ : state)
-	{
 		for (auto [e, p] : ecs.CView<becs::Position>())
 		{
 			if (ecs.HasComponent<becs::Velocity>(e))

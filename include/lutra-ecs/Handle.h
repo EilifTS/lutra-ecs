@@ -4,12 +4,13 @@
 
 namespace lcs
 {
-	template <typename T, uint32_t validation_bits>
+	template <typename T, uint32_t vb>
 	struct Handle
 	{
 		using data_t = T;
 		
 		static constexpr uint32_t handle_bits = sizeof(data_t) * 8;
+		static constexpr uint32_t validation_bits = vb;
 
 		static constexpr uint32_t index_bits = handle_bits - validation_bits;
 		static constexpr data_t max_index = (data_t(1) << index_bits) - data_t(1);

@@ -5,6 +5,7 @@
 #include "THandleFreeList.h"
 #include "TSparseSet.h"
 #include "TSparseTagSet.h"
+#include "TSparseTagSet2.h"
 
 int main(int argc, char** argv)
 {

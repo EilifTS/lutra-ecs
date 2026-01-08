@@ -4,6 +4,7 @@ file(GLOB TEST_INCLUDES
     TIndexFreeList.h
     TSparseSet.h
     TSparseTagSet.h
+    TSparseTagSet2.h
 )
 
 file(GLOB TEST_SOURCES

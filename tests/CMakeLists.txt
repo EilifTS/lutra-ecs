@@ -1,5 +1,6 @@
 file(GLOB TEST_INCLUDES
     TECS.h
+    THandleFreeList.h
     TIndexFreeList.h
     TSparseSet.h
     TSparseTagSet.h

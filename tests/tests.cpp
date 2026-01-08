@@ -2,6 +2,7 @@
 
 #include "TECS.h"
 #include "TIndexFreeList.h"
+#include "THandleFreeList.h"
 #include "TSparseSet.h"
 #include "TSparseTagSet.h"
 

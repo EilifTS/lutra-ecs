@@ -1,6 +1,7 @@
 #pragma once
 #include <gtest/gtest.h>
 #include <lutra-ecs/IndexFreeList.h>
+#include <ranges>
 
 TEST(IndexFreeList, GetIndices)
 {
@@ -126,7 +127,7 @@ TEST(IndexFreeList, OccupiedIterator)
 	const u32 i3 = list.GetNextIndex();
 
 	std::vector<u32> occs1{};
-	for (const auto& i : list.OccupiedIndices())
+	for (const auto& i : list)
 	{
 		occs1.push_back(i);
 	}
@@ -137,7 +138,7 @@ TEST(IndexFreeList, OccupiedIterator)
 
 	list.FreeIndex(i2);
 	std::vector<u32> occs2{};
-	for (const auto& i : list.OccupiedIndices())
+	for (auto i : list)
 	{
 		occs2.push_back(i);
 	}
@@ -154,8 +155,9 @@ TEST(IndexFreeList, OccupiedIteratorReverse)
 	const u32 i3 = list.GetNextIndex();
 
 	std::vector<u32> occs1{};
-	for (const auto& i : list.OccupiedIndicesReverse())
+	for (auto it = std::rbegin(list); it != std::rend(list); ++it)
 	{
+		auto i = *it;
 		occs1.push_back(i);
 	}
 	ASSERT_TRUE(occs1.size() == 3);
@@ -165,8 +167,9 @@ TEST(IndexFreeList, OccupiedIteratorReverse)
 
 	list.FreeIndex(i2);
 	std::vector<u32> occs2{};
-	for (const auto& i : list.OccupiedIndicesReverse())
+	for (auto it = std::rbegin(list); it != std::rend(list); ++it)
 	{
+		auto i = *it;
 		occs2.push_back(i);
 	}
 	ASSERT_TRUE(occs2.size() == 2);
@@ -179,5 +182,5 @@ TEST(IndexFreeList, Empty)
 	lcs::IndexFreeList list{};
 	ASSERT_TRUE(list.IsFree(0));
 	ASSERT_TRUE(list.MaxIndex() == 0);
-	for (auto i : list.OccupiedIndices()) {}
+	for (auto i : list) {}
 }

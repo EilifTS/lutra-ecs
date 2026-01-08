@@ -45,8 +45,8 @@ namespace lcs
 
 		inline EntityID CreateEntity();
 		inline void DestroyEntity(EntityID entity);
-		inline const IndexFreeList::OccupiedIndicesContainer<false> Entities() { return entity_id_generator.OccupiedIndices(); };
-		inline const IndexFreeList::OccupiedIndicesContainer<true> EntitiesReverse() { return entity_id_generator.OccupiedIndicesReverse(); };
+		inline const IndexFreeList& Entities() { return entity_id_generator; };
+		//inline const IndexFreeList::OccupiedIndicesContainer<true> EntitiesReverse() { return entity_id_generator.OccupiedIndicesReverse(); };
 		inline u32 GetEntityCount();
 
 		/* Component */

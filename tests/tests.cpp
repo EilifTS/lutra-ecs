@@ -3,6 +3,7 @@
 #include "TECS.h"
 #include "THandleFreeList.h"
 #include "TSparseSet.h"
+#include "TSparseSetChunked.h"
 #include "TSparseTagSet.h"
 
 int main(int argc, char** argv)

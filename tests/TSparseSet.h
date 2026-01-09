@@ -5,8 +5,8 @@
 using TestHandle = lcs::Handle<uint32_t, 16>;
 using u64 = uint64_t;
 
-static TestHandle ch(uint32_t validation_id, uint32_t value) { return TestHandle::Create(validation_id << TestHandle::index_bits, value); }
-static TestHandle cnh(uint32_t value) { return TestHandle::CreateNew(value); }
+TestHandle ch(uint32_t validation_id, uint32_t value) { return TestHandle::Create(validation_id << TestHandle::index_bits, value); }
+TestHandle cnh(uint32_t value) { return TestHandle::CreateNew(value); }
 
 TEST(SparseSet, TestInsertHasGet)
 {

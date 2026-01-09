@@ -7,6 +7,8 @@
 
 namespace becs
 {
+	using EntityID = lcs::Handle<uint32_t, 16>;
+
 	struct Position
 	{
 		static constexpr lcs::ComponentType component_type = lcs::ComponentType::Component;
@@ -26,9 +28,9 @@ namespace becs
 		bool is_there;
 	};
 
-	using ECS = lcs::ECSManager<Position, Velocity, Player>;
+	using ECS = lcs::ECSManager<EntityID, Position, Velocity, Player>;
 
-	inline lcs::EntityID CreatePlayer(ECS& ecs, int x, int y)
+	inline EntityID CreatePlayer(ECS& ecs, int x, int y)
 	{
 		auto entity = ecs.CreateEntity();
 		ecs.AddComponent<Position>(entity, { x, y });
@@ -40,15 +42,15 @@ namespace becs
 
 static void BenchmarkECS(benchmark::State& state)
 {
-	const u32 player_count = state.range(0);
+	const uint32_t player_count = state.range(0);
 
 	becs::ECS ecs{};
 
-	std::vector<lcs::EntityID> players;
+	std::vector<becs::EntityID> players;
 	std::vector<becs::Position> positions(player_count);
 	std::vector<becs::Velocity> velocities(player_count);
 
-	for (u32 i = 0; i < player_count; i++)
+	for (uint32_t i = 0; i < player_count; i++)
 	{
 		players.push_back(becs::CreatePlayer(ecs, 1, i));
 		positions[i] = { 1, (int)i };
@@ -73,18 +75,18 @@ static void BenchmarkECS(benchmark::State& state)
 
 static void BenchmarkECSSTD(benchmark::State& state)
 {
-	const u32 player_count = state.range(0);
+	const uint32_t player_count = state.range(0);
 
 	becs::ECS ecs{};
 
-	std::vector<u32> entity_id_to_position_idx;
-	std::vector<u32> entity_id_to_velocity_idx;
-	std::vector<u32> position_idx_to_entity_id;
-	std::vector<u32> velocity_idx_to_entity_id;
+	std::vector<uint32_t> entity_id_to_position_idx;
+	std::vector<uint32_t> entity_id_to_velocity_idx;
+	std::vector<uint32_t> position_idx_to_entity_id;
+	std::vector<uint32_t> velocity_idx_to_entity_id;
 	std::vector<becs::Position> positions(player_count);
 	std::vector<becs::Velocity> velocities(player_count);
 
-	for (u32 i = 0; i < player_count; i++)
+	for (uint32_t i = 0; i < player_count; i++)
 	{
 		entity_id_to_position_idx.push_back(i);
 		entity_id_to_velocity_idx.push_back(i);
@@ -97,10 +99,10 @@ static void BenchmarkECSSTD(benchmark::State& state)
 	for (auto _ : state)
 	{
 		/* Mimic ECS, but with pure std funcs */
-		for (u32 entity_id : position_idx_to_entity_id)
+		for (uint32_t entity_id : position_idx_to_entity_id)
 		{
 			/* Has velocity */
-			if (entity_id_to_velocity_idx[entity_id] != ~(u32(0)))
+			if (entity_id_to_velocity_idx[entity_id] != ~(uint32_t(0)))
 			{
 				becs::Position& p = positions[entity_id_to_position_idx[entity_id]];
 				becs::Velocity& v = velocities[entity_id_to_velocity_idx[entity_id]];

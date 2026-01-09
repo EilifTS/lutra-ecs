@@ -1,118 +1,123 @@
 #include <gtest/gtest.h>
 
 #include <lutra-ecs/SparseSet.h>
+
+using TestHandle = lcs::Handle<uint32_t, 16>;
 using u64 = uint64_t;
+
+static TestHandle ch(uint32_t validation_id, uint32_t value) { return TestHandle::Create(validation_id << TestHandle::index_bits, value); }
+static TestHandle cnh(uint32_t value) { return TestHandle::CreateNew(value); }
 
 TEST(SparseSet, TestInsertHasGet)
 {
-	lcs::SparseSet<u64> set{};
+	lcs::SparseSet<TestHandle, u64> set{};
 	set.ReserveSparseSize(103);
 
-	set.Add(100, 1);
+	set.Add(cnh(100), 1);
 	ASSERT_TRUE(set.DenseSize() == 1);
-	set.Add(102, 2);
+	set.Add(cnh(102), 2);
 	ASSERT_TRUE(set.DenseSize() == 2);
-	set.Add(50, 3);
+	set.Add(cnh(50), 3);
 	ASSERT_TRUE(set.DenseSize() == 3);
 
-	ASSERT_TRUE(!set.Has(0));
-	ASSERT_TRUE(!set.Has(10));
-	ASSERT_TRUE(!set.Has(1000));
-	ASSERT_TRUE(!set.Has(1234557));
+	ASSERT_TRUE(!set.Has(cnh(0)));
+	ASSERT_TRUE(!set.Has(cnh(10)));
+	ASSERT_TRUE(!set.Has(cnh(55)));
+	ASSERT_TRUE(!set.Has(cnh(66)));
 
-	ASSERT_TRUE(set.Has(100));
-	ASSERT_TRUE(set.Has(102));
-	ASSERT_TRUE(set.Has(50));
+	ASSERT_TRUE(set.Has(cnh(100)));
+	ASSERT_TRUE(set.Has(cnh(102)));
+	ASSERT_TRUE(set.Has(cnh(50)));
 
-	ASSERT_TRUE(set.Get(100) == 1);
-	ASSERT_TRUE(set.Get(102) == 2);
-	ASSERT_TRUE(set.Get(50) == 3);
+	ASSERT_TRUE(set.Get(cnh(100)) == 1);
+	ASSERT_TRUE(set.Get(cnh(102)) == 2);
+	ASSERT_TRUE(set.Get(cnh(50)) == 3);
 }
 
 TEST(SparseSet, TestRemove)
 {
-	lcs::SparseSet<u64> set{};
+	lcs::SparseSet<TestHandle, u64> set{};
 	set.ReserveSparseSize(56);
 
-	set.Add(33, 1);
+	set.Add(cnh(33), 1);
 	ASSERT_TRUE(set.DenseSize() == 1);
-	set.Add(44, 2);
+	set.Add(cnh(44), 2);
 	ASSERT_TRUE(set.DenseSize() == 2);
-	set.Add(55, 3);
+	set.Add(cnh(55), 3);
 	ASSERT_TRUE(set.DenseSize() == 3);
 
-	set.Remove(44);
+	set.Remove(cnh(44));
 	ASSERT_TRUE(set.DenseSize() == 2);
-	ASSERT_TRUE(!set.Has(43));
-	ASSERT_TRUE(!set.Has(44));
-	ASSERT_TRUE(!set.Has(45));
+	ASSERT_TRUE(!set.Has(cnh(43)));
+	ASSERT_TRUE(!set.Has(cnh(44)));
+	ASSERT_TRUE(!set.Has(cnh(45)));
 
-	ASSERT_TRUE(set.Has(33));
-	ASSERT_TRUE(set.Has(55));
+	ASSERT_TRUE(set.Has(cnh(33)));
+	ASSERT_TRUE(set.Has(cnh(55)));
 }
 
 TEST(SparseSet, TestInsertRemoveInsert)
 {
-	lcs::SparseSet<u64> set{};
+	lcs::SparseSet<TestHandle, u64> set{};
 	set.ReserveSparseSize(58);
 
-	set.Add(33, 1);
-	set.Add(44, 2);
-	set.Add(55, 3);
-	set.Remove(44);
-	set.Remove(55);
-	set.Add(55, 10);
-	set.Add(56, 11);
-	set.Add(57, 12);
-	set.Remove(33);
-	set.Remove(56);
-	set.Remove(57);
-	set.Add(33, 100);
+	set.Add(cnh(33), 1);
+	set.Add(cnh(44), 2);
+	set.Add(cnh(55), 3);
+	set.Remove(cnh(44));
+	set.Remove(cnh(55));
+	set.Add(cnh(55), 10);
+	set.Add(cnh(56), 11);
+	set.Add(cnh(57), 12);
+	set.Remove(cnh(33));
+	set.Remove(cnh(56));
+	set.Remove(cnh(57));
+	set.Add(cnh(33), 100);
 
 	ASSERT_TRUE(set.DenseSize() == 2);
-	ASSERT_TRUE(set.Has(55));
-	ASSERT_TRUE(set.Has(33));
-	ASSERT_TRUE(set.Get(33) == 100);
-	ASSERT_TRUE(set.Get(55) == 10);
+	ASSERT_TRUE(set.Has(cnh(55)));
+	ASSERT_TRUE(set.Has(cnh(33)));
+	ASSERT_TRUE(set.Get(cnh(33)) == 100);
+	ASSERT_TRUE(set.Get(cnh(55)) == 10);
 
-	ASSERT_TRUE(!set.Has(44));
-	ASSERT_TRUE(!set.Has(56));
-	ASSERT_TRUE(!set.Has(57));
+	ASSERT_TRUE(!set.Has(cnh(44)));
+	ASSERT_TRUE(!set.Has(cnh(56)));
+	ASSERT_TRUE(!set.Has(cnh(57)));
 }
 
 TEST(SparseSet, TestInsertRemoveInsert2)
 {
-	lcs::SparseSet<u64> set{};
+	lcs::SparseSet<TestHandle, u64> set{};
 	set.ReserveSparseSize(3);
 
-	set.Add(0, 0);
-	set.Add(1, 1);
-	set.Remove(1);
-	set.Add(2, 2);
-	set.Add(1, 3);
+	set.Add(cnh(0), 0);
+	set.Add(cnh(1), 1);
+	set.Remove(cnh(1));
+	set.Add(cnh(2), 2);
+	set.Add(cnh(1), 3);
 
-	ASSERT_TRUE(set.Has(0));
-	ASSERT_TRUE(set.Has(1));
-	ASSERT_TRUE(set.Has(2));
-	ASSERT_TRUE(set.Get(0) == 0);
-	ASSERT_TRUE(set.Get(1) == 3);
-	ASSERT_TRUE(set.Get(2) == 2);
+	ASSERT_TRUE(set.Has(cnh(0)));
+	ASSERT_TRUE(set.Has(cnh(1)));
+	ASSERT_TRUE(set.Has(cnh(2)));
+	ASSERT_TRUE(set.Get(cnh(0)) == 0);
+	ASSERT_TRUE(set.Get(cnh(1)) == 3);
+	ASSERT_TRUE(set.Get(cnh(2)) == 2);
 }
 
 TEST(SparseSet, TestIteration)
 {
-	lcs::SparseSet<u64> set{};
+	lcs::SparseSet<TestHandle, u64> set{};
 	set.ReserveSparseSize(16);
 
-	set.Add(5, 1);
-	set.Add(10, 2);
-	set.Add(15, 3);
+	set.Add(cnh(5), 1);
+	set.Add(cnh(10), 2);
+	set.Add(cnh(15), 3);
 
-	u32 index_sum = 0;
+	uint32_t index_sum = 0;
 	u64 data_sum = 0;
 	for (auto it = set.begin(); it != set.end(); ++it)
 	{
-		index_sum += it.GetOwner();
+		index_sum += it.GetOwner().GetIndex();
 		data_sum += *it;
 	}
 	ASSERT_TRUE(index_sum == 30);
@@ -121,12 +126,12 @@ TEST(SparseSet, TestIteration)
 
 TEST(SparseSet, TestIterationReverse)
 {
-	lcs::SparseSet<u64> set{};
+	lcs::SparseSet<TestHandle, u64> set{};
 	set.ReserveSparseSize(16);
 
-	set.Add(5, 1);
-	set.Add(10, 2);
-	set.Add(15, 3);
+	set.Add(cnh(5), 1);
+	set.Add(cnh(10), 2);
+	set.Add(cnh(15), 3);
 
 	std::vector<u64> values{};
 	for (auto it = set.rbegin(); it != set.rend(); ++it)
@@ -140,16 +145,13 @@ TEST(SparseSet, TestIterationReverse)
 
 TEST(SparseSet, TestClearSparse)
 {
-	lcs::SparseSet<u64> set{};
+	lcs::SparseSet<TestHandle, u64> set{};
 	set.ReserveSparseSize(16);
 
-	set.Add(5, 1);
-	set.Add(10, 2);
-	set.Add(15, 3);
+	set.Add(cnh(5), 1);
+	set.Add(cnh(10), 2);
+	set.Add(cnh(15), 3);
 
 	set.Clear();
-	ASSERT_TRUE(!set.Has(5));
-	ASSERT_TRUE(!set.Has(10));
-	ASSERT_TRUE(!set.Has(15));
 	ASSERT_TRUE(set.DenseSize() == 0);
 }

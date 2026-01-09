@@ -3,9 +3,9 @@ file(GLOB TEST_INCLUDES
     THandleFreeList.h
     TIndexFreeList.h
     TSparseSet.h
-    TSparseSet2.h
+    TSparseSet.h
     TSparseTagSet.h
-    TSparseTagSet2.h
+    TSparseTagSet.h
 )
 
 file(GLOB TEST_SOURCES

@@ -1,5 +1,4 @@
 #pragma once
-#include <lutra-ecs/EntityID.h>
 #include <lutra-ecs/SparseSet.h>
 #include <lutra-ecs/SparseTagSet.h>
 
@@ -7,17 +6,17 @@
 
 namespace lcs
 {
-	template <typename T>
+	template <typename EntityID, typename T>
 	class ComponentView
 	{
 	public:
-		ComponentView(SparseSet<T>& set) : set(set) {};
+		ComponentView(SparseSet<EntityID, T>& set) : set(set) {};
 
 		class Iterator
 		{
 		public:
 			/* Constructor */
-			Iterator(SparseSet<T>::Iterator it) : set_iterator(it) {};
+			Iterator(SparseSet<EntityID, T>::Iterator it) : set_iterator(it) {};
 
 			/* Class for enabling arrow operator on temporary return object */
 			class ArrowHelper
@@ -30,7 +29,7 @@ namespace lcs
 			};
 
 			/* Accessors */
-			inline std::pair<EntityID, T&> operator*(){ return std::pair<EntityID, T&>(EntityID(set_iterator.GetOwner()), *set_iterator); }
+			inline std::pair<EntityID, T&> operator*(){ return std::pair<EntityID, T&>(set_iterator.GetOwner(), *set_iterator); }
 			inline ArrowHelper operator->() { return ArrowHelper(set_iterator.GetOwner(), *set_iterator); }
 
 			/* Prefix increment */
@@ -43,33 +42,33 @@ namespace lcs
 			friend bool operator!= (const Iterator& a, const Iterator& b) { return a.set_iterator != b.set_iterator; };
 
 		private:
-			SparseSet<T>::Iterator set_iterator;
+			SparseSet<EntityID, T>::Iterator set_iterator;
 		};
 
 		inline Iterator begin();
 		inline Iterator end();
 
 	private:
-		SparseSet<T>& set;
+		SparseSet<EntityID, T>& set;
 	};
 
-	template <typename T>
-	inline ComponentView<T>::Iterator ComponentView<T>::begin() { return ComponentView<T>::Iterator(set.begin()); };
+	template <typename EntityID, typename T>
+	inline ComponentView<EntityID, T>::Iterator ComponentView<EntityID, T>::begin() { return ComponentView<EntityID, T>::Iterator(set.begin()); };
 
-	template <typename T>
-	inline ComponentView<T>::Iterator ComponentView<T>::end() { return ComponentView<T>::Iterator(set.end()); };
+	template <typename EntityID, typename T>
+	inline ComponentView<EntityID, T>::Iterator ComponentView<EntityID, T>::end() { return ComponentView<EntityID, T>::Iterator(set.end()); };
 
-	template <typename T>
+	template <typename EntityID, typename T>
 	class TagView
 	{
 	public:
-		TagView(SparseTagSetT<T>& set) : set(set) {};
+		TagView(SparseTagSetT<EntityID, T>& set) : set(set) {};
 
 		class Iterator
 		{
 		public:
 			/* Constructor */
-			Iterator(SparseTagSetT<T>::Iterator it) : set_iterator(it) {};
+			Iterator(SparseTagSetT<EntityID, T>::Iterator it) : set_iterator(it) {};
 
 			/* Class for enabling arrow operator on temporary return object */
 			class ArrowHelper
@@ -95,19 +94,19 @@ namespace lcs
 			friend bool operator!= (const Iterator& a, const Iterator& b) { return a.set_iterator != b.set_iterator; };
 
 		private:
-			SparseTagSetT<T>::Iterator set_iterator;
+			SparseTagSetT<EntityID, T>::Iterator set_iterator;
 		};
 
 		inline Iterator begin();
 		inline Iterator end();
 
 	private:
-		SparseTagSetT<T>& set;
+		SparseTagSetT<EntityID, T>& set;
 	};
 
-	template <typename T>
-	inline TagView<T>::Iterator TagView<T>::begin() { return TagView<T>::Iterator(set.begin()); };
+	template <typename EntityID, typename T>
+	inline TagView<EntityID, T>::Iterator TagView<EntityID, T>::begin() { return TagView<EntityID, T>::Iterator(set.begin()); };
 
-	template <typename T>
-	inline TagView<T>::Iterator TagView<T>::end() { return TagView<T>::Iterator(set.end()); };
+	template <typename EntityID, typename T>
+	inline TagView<EntityID, T>::Iterator TagView<EntityID, T>::end() { return TagView<EntityID, T>::Iterator(set.end()); };
 }

@@ -1,34 +1,31 @@
 #pragma once
+#include <lutra-ecs/Handle.h>
 #include <algorithm>
-#include <cinttypes>
 #include <cassert>
 #include <utility>
 #include <vector>
 
-using u32 = uint32_t;
-
 namespace lcs
 {
-	template <typename T>
+	template <typename handle_t, typename T>
 	class SparseSet
 	{
 	public:
+		using data_t = handle_t::data_t;
+
 		SparseSet() {};
 
-		inline void Add(u32 index, T&& data);
+		inline void Add(handle_t handle, T&& data);
+		inline T& Get(handle_t handle);
+		inline const T& Get(handle_t handle) const { return Get(handle); };
+		inline void Remove(handle_t handle);
+		inline void RemoveIfPresent(handle_t handle);
+		inline bool Has(handle_t handle) const;
 
-		inline T& Get(u32 index);
+		inline data_t SparseSize() const { return data_t(sparse_indices.size()); };
+		inline data_t DenseSize() const { return data_t(dense_data.size()); };
 
-		inline const T& Get(u32 index) const { return Get(index); };
-
-		inline void Remove(u32 index);
-		inline void RemoveIfPresent(u32 index);
-		inline bool Has(u32 index) const;
-
-		inline u32 SparseSize() const { return u32(sparse_indices.size()); };
-		inline u32 DenseSize() const { return u32(dense_data.size()); };
-
-		inline void ReserveSparseSize(u32 new_size);
+		inline void ReserveSparseSize(data_t new_size);
 		inline void Clear();
 
 		class Iterator
@@ -43,7 +40,7 @@ namespace lcs
 			inline T& operator*() const { return owner.dense_data[dense_index]; }
 			inline T* operator->() { return &(owner.dense_data[dense_index]); }
 
-			inline u32 GetOwner() const { return owner.inverse_list[dense_index]; };
+			inline handle_t GetOwner() const { return owner.inverse_list[dense_index]; };
 
 			inline Iterator& operator++() { dense_index++; return *this; }
 			inline Iterator& operator--() { dense_index--; return *this; }
@@ -60,8 +57,8 @@ namespace lcs
 			friend bool operator== (const Iterator& a, const Iterator& b) { return a.dense_index == b.dense_index; };
 			friend bool operator!= (const Iterator& a, const Iterator& b) { return a.dense_index != b.dense_index; };
 		private:
-			inline Iterator(SparseSet& owner, u32 dense_index) : dense_index(dense_index), owner(owner) {}
-			u32 dense_index;
+			inline Iterator(SparseSet& owner, data_t dense_index) : dense_index(dense_index), owner(owner) {}
+			data_t dense_index;
 			SparseSet& owner;
 
 			friend class SparseSet;
@@ -78,40 +75,42 @@ namespace lcs
 		inline RIterator rend() { return RIterator(Iterator(*this, 0)); };
 
 	private:
-		constexpr static u32 invalid_index{ u32(-1) };
+		constexpr static data_t invalid_index{ data_t(-1) };
 
-		inline bool isValidInputIndex(u32 index) const;
+		inline void assertValidInputHandle(handle_t handle) const;
 
-		std::vector<u32> sparse_indices;
-		std::vector<u32> inverse_list;
+		std::vector<data_t> sparse_indices;
+		std::vector<handle_t> inverse_list;
 		std::vector<T> dense_data;
 	};
 
-	template <typename T>
-	void SparseSet<T>::Add(u32 index, T&& data)
+	template <typename handle_t, typename T>
+	void SparseSet<handle_t, T>::Add(handle_t handle, T&& data)
 	{
-		assert(index < SparseSize()); /* Invalid index or missing reservation */
-		assert(sparse_indices[index] == invalid_index);
+		const auto handle_index = handle.GetIndex();
+		assert(handle_index < SparseSize()); /* Invalid index or missing reservation */
+		assert(sparse_indices[handle_index] == invalid_index);
 
 		dense_data.emplace_back(data);
-		inverse_list.push_back(index);
-		sparse_indices[index] = DenseSize() - 1;
+		inverse_list.push_back(handle);
+		sparse_indices[handle_index] = DenseSize() - 1;
 	}
 
-	template <typename T>
-	T& SparseSet<T>::Get(u32 index)
+	template <typename handle_t, typename T>
+	T& SparseSet<handle_t, T>::Get(handle_t handle)
 	{
-		assert(isValidInputIndex(index));
-		return dense_data[sparse_indices[index]];
+		assertValidInputHandle(handle);
+		return dense_data[sparse_indices[handle.GetIndex()]];
 	}
 
-	template <typename T>
-	void SparseSet<T>::Remove(u32 index)
+	template <typename handle_t, typename T>
+	void SparseSet<handle_t, T>::Remove(handle_t handle)
 	{
-		assert(isValidInputIndex(index));
-		u32 back_index = inverse_list.back();
-		u32 dense_index = sparse_indices[index];
-		u32 dense_back_index = sparse_indices[back_index];
+		assertValidInputHandle(handle);
+		const auto handle_index = handle.GetIndex();
+		const auto back_index = inverse_list.back().GetIndex();
+		const auto dense_index = sparse_indices[handle_index];
+		const auto dense_back_index = sparse_indices[back_index];
 
 		if (dense_back_index != dense_index)
 		{
@@ -122,44 +121,47 @@ namespace lcs
 		inverse_list.pop_back();
 
 		sparse_indices[back_index] = dense_index;
-		sparse_indices[index] = invalid_index;
+		sparse_indices[handle_index] = invalid_index;
 	}
 
-	template <typename T>
-	void SparseSet<T>::RemoveIfPresent(u32 index)
+	template <typename handle_t, typename T>
+	void SparseSet<handle_t, T>::RemoveIfPresent(handle_t handle)
 	{
-		if (Has(index)) Remove(index);
+		if (Has(handle)) Remove(handle);
 	}
 
-	template <typename T>
-	bool SparseSet<T>::Has(u32 index) const
+	template <typename handle_t, typename T>
+	bool SparseSet<handle_t, T>::Has(handle_t handle) const
 	{
-		if (index >= SparseSize()) return false;
-		if (sparse_indices[index] == invalid_index) return false;
+		const auto handle_index = handle.GetIndex();
+		assert(handle_index < SparseSize());
+		if (sparse_indices[handle_index] == invalid_index) return false;
+		assert(inverse_list[sparse_indices[handle_index]].GetValidationID() == handle.GetValidationID()); /* Check for stale handle */
 		return true;
 	}
 
-	template <typename T>
-	inline void SparseSet<T>::ReserveSparseSize(u32 new_size)
+	template <typename handle_t, typename T>
+	inline void SparseSet<handle_t, T>::ReserveSparseSize(handle_t::data_t new_size)
 	{
 		assert(new_size > SparseSize());
 		sparse_indices.resize(size_t(new_size), invalid_index);
 	}
 
-	template <typename T>
-	inline void SparseSet<T>::Clear()
+	template <typename handle_t, typename T>
+	inline void SparseSet<handle_t, T>::Clear()
 	{
 		sparse_indices.clear();
 		inverse_list.clear();
 		dense_data.clear();
 	}
 
-	template <typename T>
-	bool SparseSet<T>::isValidInputIndex(u32 index) const
+	template <typename handle_t, typename T>
+	inline void SparseSet<handle_t, T>::assertValidInputHandle(handle_t handle) const
 	{
-		if (index >= SparseSize()) return false;
-		if (sparse_indices[index] == invalid_index) return false;
-		if (sparse_indices[index] >= DenseSize()) return false;
-		return true;
+		const auto handle_index = handle.GetIndex();
+		assert(handle_index < SparseSize());
+		assert(sparse_indices[handle_index] != invalid_index);
+		assert(sparse_indices[handle_index] < DenseSize());
+		assert(inverse_list[sparse_indices[handle_index]].GetValidationID() == handle.GetValidationID()); /* Check for stale handle */
 	}
 }

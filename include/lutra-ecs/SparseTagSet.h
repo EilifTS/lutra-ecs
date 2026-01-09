@@ -1,67 +1,72 @@
 #pragma once
+#include <lutra-ecs/Handle.h>
 #include <vector>
 #include <algorithm>
-#include <cinttypes>
 #include <assert.h>
-
-using u32 = uint32_t;
 
 namespace lcs
 {
+	template <typename handle_t>
 	class SparseTagSet
 	{
 	public:
+		using data_t = handle_t::data_t;
+
 		inline SparseTagSet() {};
 
-		inline void Add(u32 index);
+		inline void Add(handle_t handle);
 
-		inline void Remove(u32 index);
-		inline void RemoveIfPresent(u32 index);
-		inline bool Has(u32 index) const;
+		inline void Remove(handle_t handle);
+		inline void RemoveIfPresent(handle_t handle);
+		inline bool Has(handle_t handle) const;
 
-		inline u32 SparseSize() const { return (u32)sparse_indices.size(); };
-		inline u32 DenseSize() const { return (u32)inverse_list.size(); };
+		inline data_t SparseSize() const { return data_t(sparse_indices.size()); };
+		inline data_t DenseSize() const { return data_t(inverse_list.size()); };
 
-		inline void ReserveSparseSize(u32 new_size);
+		inline void ReserveSparseSize(data_t new_size);
 		inline void Clear();
 
-		using Iterator = std::vector<u32>::iterator;
+		using Iterator = std::vector<handle_t>::iterator;
 		
 		inline Iterator begin() { return inverse_list.begin(); };
 
 		inline Iterator end() { return inverse_list.end(); };
 
 	private:
-		constexpr static u32 invalid_index{ u32(-1) };
+		constexpr static data_t invalid_index{ data_t(-1) };
 
-		inline bool isValidInputIndex(u32 index) const;
+		inline void assertValidInputHandle(handle_t handle) const;
 
-		std::vector<u32> sparse_indices;
-		std::vector<u32> inverse_list;
+		std::vector<data_t> sparse_indices;
+		std::vector<handle_t> inverse_list;
 	};
 
 	/* Templated version for specific tags */
-	template <typename T>
-	class SparseTagSetT : public SparseTagSet
+	template <typename handle_t, typename T>
+	class SparseTagSetT : public SparseTagSet<handle_t>
 	{
 
 	};
 
-	void SparseTagSet::Add(u32 index)
+	template <typename handle_t>
+	void SparseTagSet<handle_t>::Add(handle_t handle)
 	{
-		assert(index < SparseSize()); /* Invalid index or missing reservation */
-		assert(sparse_indices[index] == invalid_index);
+		const auto handle_index = handle.GetIndex();
+		assert(handle_index < SparseSize()); /* Invalid index or missing reservation */
+		assert(sparse_indices[handle_index] == invalid_index);
 
-		inverse_list.push_back(index);
-		sparse_indices[index] = DenseSize() - 1;
+		inverse_list.push_back(handle);
+		sparse_indices[handle_index] = DenseSize() - 1;
 	}
 
-	void SparseTagSet::Remove(u32 index)
+	template <typename handle_t>
+	void SparseTagSet<handle_t>::Remove(handle_t handle)
 	{
-		assert(isValidInputIndex(index));
-		u32 back_index = inverse_list.back();
-		u32 dense_index = sparse_indices[index];
-		u32 dense_back_index = sparse_indices[back_index];
+		assertValidInputHandle(handle);
+		const auto handle_index = handle.GetIndex();
+		const auto back_index = inverse_list.back().GetIndex();
+		const auto dense_index = sparse_indices[handle_index];
+		const auto dense_back_index = sparse_indices[back_index];
 
 		if (dense_back_index != dense_index)
 		{
@@ -70,38 +75,46 @@ namespace lcs
 		inverse_list.pop_back();
 
 		sparse_indices[back_index] = dense_index;
-		sparse_indices[index] = invalid_index;
+		sparse_indices[handle_index] = invalid_index;
 	}
 
-	void SparseTagSet::RemoveIfPresent(u32 index)
+	template <typename handle_t>
+	void SparseTagSet<handle_t>::RemoveIfPresent(handle_t handle)
 	{
-		if (Has(index)) Remove(index);
+		if (Has(handle)) Remove(handle);
 	}
 
-	bool SparseTagSet::Has(u32 index) const
+	template <typename handle_t>
+	bool SparseTagSet<handle_t>::Has(handle_t handle) const
 	{
-		if (index >= SparseSize()) return false;
-		if (sparse_indices[index] == invalid_index) return false;
+		const auto handle_index = handle.GetIndex();
+		assert(handle_index < SparseSize());
+		if (sparse_indices[handle_index] == invalid_index) return false;
+		assert(inverse_list[sparse_indices[handle_index]].GetValidationID() == handle.GetValidationID()); /* Check for stale handle */
 		return true;
 	}
 
-	inline void SparseTagSet::ReserveSparseSize(u32 new_size)
+	template <typename handle_t>
+	inline void SparseTagSet<handle_t>::ReserveSparseSize(handle_t::data_t new_size)
 	{
 		assert(new_size > SparseSize());
 		sparse_indices.resize(size_t(new_size), invalid_index);
 	}
 
-	inline void SparseTagSet::Clear()
+	template <typename handle_t>
+	inline void SparseTagSet<handle_t>::Clear()
 	{
 		sparse_indices.clear();
 		inverse_list.clear();
 	}
 
-	bool SparseTagSet::isValidInputIndex(u32 index) const
+	template <typename handle_t>
+	void SparseTagSet<handle_t>::assertValidInputHandle(handle_t handle) const
 	{
-		if (index >= SparseSize()) return false;
-		if (sparse_indices[index] == invalid_index) return false;
-		if (sparse_indices[index] >= DenseSize()) return false;
-		return true;
+		const auto handle_index = handle.GetIndex();
+		assert(handle_index < SparseSize());
+		assert(sparse_indices[handle_index] != invalid_index);
+		assert(sparse_indices[handle_index] < DenseSize());
+		assert(inverse_list[sparse_indices[handle_index]].GetValidationID() == handle.GetValidationID()); /* Check for stale handle */
 	}
 }

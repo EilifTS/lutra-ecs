@@ -3,6 +3,8 @@
 
 namespace TECS
 {
+	using EntityID = lcs::Handle<uint32_t, 16>;
+
 	struct Position
 	{
 		static constexpr lcs::ComponentType component_type = lcs::ComponentType::Component;
@@ -36,9 +38,9 @@ namespace TECS
 		static constexpr lcs::ComponentType component_type = lcs::ComponentType::Tag;
 	};
 
-	using ECS = lcs::ECSManager<Position, Velocity, Player, Enemy, Weapon, IsWet>;
+	using ECS = lcs::ECSManager<EntityID, Position, Velocity, Player, Enemy, Weapon, IsWet>;
 
-	inline lcs::EntityID CreatePlayer(ECS& ecs, int x, int y)
+	inline EntityID CreatePlayer(ECS& ecs, int x, int y)
 	{
 		auto entity = ecs.CreateEntity();
 		ecs.AddComponent<Position>(entity, { x, y });
@@ -47,7 +49,7 @@ namespace TECS
 		return entity;
 	}
 
-	inline lcs::EntityID CreateEnemy(ECS& ecs, int x, int y)
+	inline EntityID CreateEnemy(ECS& ecs, int x, int y)
 	{
 		auto entity = ecs.CreateEntity();
 		ecs.AddComponent<Position>(entity, { x, y });
@@ -77,7 +79,7 @@ TEST(ECS, TestCreation1)
 	constexpr int player_pos_x{ 2 };
 	constexpr int player_pos_y{ 1 };
 
-	lcs::EntityID e = TECS::CreatePlayer(ecs, player_pos_x, player_pos_y);
+	TECS::EntityID e = TECS::CreatePlayer(ecs, player_pos_x, player_pos_y);
 	ASSERT_TRUE(ecs.HasComponent<TECS::Position>(e));
 	ASSERT_TRUE(ecs.HasComponent<TECS::Velocity>(e));
 	ASSERT_TRUE(ecs.HasComponent<TECS::Player>(e));
@@ -99,8 +101,8 @@ TEST(ECS, TestCreation2)
 	constexpr int enemy_pos_x{ 1 };
 	constexpr int enemy_pos_y{ 1 };
 
-	lcs::EntityID e1 = TECS::CreatePlayer(ecs, player_pos_x, player_pos_y);
-	lcs::EntityID e2 = TECS::CreateEnemy(ecs, enemy_pos_x, enemy_pos_y);
+	TECS::EntityID e1 = TECS::CreatePlayer(ecs, player_pos_x, player_pos_y);
+	TECS::EntityID e2 = TECS::CreateEnemy(ecs, enemy_pos_x, enemy_pos_y);
 
 	ASSERT_TRUE(ecs.HasComponent<TECS::Position>(e1));
 	ASSERT_TRUE(ecs.HasComponent<TECS::Velocity>(e1));
@@ -133,10 +135,10 @@ TEST(ECS, TestCreationDestruction)
 	constexpr int enemy_pos_x2{ 5 };
 	constexpr int enemy_pos_y2{ 6 };
 
-	lcs::EntityID e1 = TECS::CreatePlayer(ecs, player_pos_x, player_pos_y);
-	lcs::EntityID e2 = TECS::CreateEnemy(ecs, enemy_pos_x1, enemy_pos_y1);
+	TECS::EntityID e1 = TECS::CreatePlayer(ecs, player_pos_x, player_pos_y);
+	TECS::EntityID e2 = TECS::CreateEnemy(ecs, enemy_pos_x1, enemy_pos_y1);
 	ecs.DestroyEntity(e2);
-	lcs::EntityID e3 = TECS::CreateEnemy(ecs, enemy_pos_x2, enemy_pos_y2);
+	TECS::EntityID e3 = TECS::CreateEnemy(ecs, enemy_pos_x2, enemy_pos_y2);
 
 	ASSERT_TRUE(ecs.HasComponent<TECS::Position>(e1));
 	ASSERT_TRUE(ecs.HasComponent<TECS::Velocity>(e1));
@@ -165,7 +167,7 @@ TEST(ECS, TestComponentRemoval)
 	constexpr int player_pos_x{ 2 };
 	constexpr int player_pos_y{ 1 };
 
-	lcs::EntityID e = TECS::CreatePlayer(ecs, player_pos_x, player_pos_y);
+	TECS::EntityID e = TECS::CreatePlayer(ecs, player_pos_x, player_pos_y);
 	ecs.RemoveComponent<TECS::Velocity>(e);
 	ASSERT_TRUE(ecs.HasComponent<TECS::Position>(e));
 	ASSERT_TRUE(!ecs.HasComponent<TECS::Velocity>(e));
@@ -186,7 +188,7 @@ TEST(ECS, TestSparseIteration)
 	constexpr int player_pos_x{ 2 };
 	constexpr int player_pos_y{ 1 };
 
-	std::vector<lcs::EntityID> entities;
+	std::vector<TECS::EntityID> entities;
 	for (int i = 0; i < 100; i++)
 	{
 		entities.push_back(TECS::CreatePlayer(ecs, player_pos_x + i, player_pos_y));
@@ -222,10 +224,10 @@ TEST(ECS, TestTagCreation)
 {
 	TECS::ECS ecs{ };
 
-	lcs::EntityID e1 = ecs.CreateEntity();
-	lcs::EntityID e2 = ecs.CreateEntity();
-	lcs::EntityID e3 = ecs.CreateEntity();
-	lcs::EntityID e4 = ecs.CreateEntity();
+	TECS::EntityID e1 = ecs.CreateEntity();
+	TECS::EntityID e2 = ecs.CreateEntity();
+	TECS::EntityID e3 = ecs.CreateEntity();
+	TECS::EntityID e4 = ecs.CreateEntity();
 
 	ASSERT_TRUE(!ecs.HasTag<TECS::IsWet>(e1));
 	ASSERT_TRUE(!ecs.HasTag<TECS::IsWet>(e2));
@@ -255,7 +257,7 @@ TEST(ECS, TestTagCreation)
 
 	ecs.AddTag<TECS::IsWet>(e4);
 
-	std::vector<lcs::EntityID> tagged_entities{};
+	std::vector<TECS::EntityID> tagged_entities{};
 	for (auto e : ecs.TView<TECS::IsWet>())
 	{
 		tagged_entities.push_back(e);
@@ -271,10 +273,10 @@ TEST(ECS, TestDualManager)
 	TECS::ECS ecs1{ };
 	TECS::ECS ecs2{ };
 
-	lcs::EntityID e1_ecs1 = ecs1.CreateEntity();
-	lcs::EntityID e1_ecs2 = ecs2.CreateEntity();
-	lcs::EntityID e2_ecs2 = ecs2.CreateEntity();
-	lcs::EntityID e2_ecs1 = ecs1.CreateEntity();
+	TECS::EntityID e1_ecs1 = ecs1.CreateEntity();
+	TECS::EntityID e1_ecs2 = ecs2.CreateEntity();
+	TECS::EntityID e2_ecs2 = ecs2.CreateEntity();
+	TECS::EntityID e2_ecs1 = ecs1.CreateEntity();
 
 	ecs1.AddComponent<TECS::Position>(e1_ecs1, { 1, 1 });
 	ecs1.AddComponent<TECS::Position>(e2_ecs1, { 2, 1 });
@@ -302,7 +304,7 @@ TEST(ECS, TestUseAfterClear)
 	constexpr int player_pos_x{ 2 };
 	constexpr int player_pos_y{ 1 };
 
-	lcs::EntityID e = TECS::CreatePlayer(ecs, player_pos_x, player_pos_y);
+	TECS::EntityID e = TECS::CreatePlayer(ecs, player_pos_x, player_pos_y);
 	ASSERT_TRUE(ecs.HasComponent<TECS::Position>(e));
 	ASSERT_TRUE(ecs.HasComponent<TECS::Velocity>(e));
 	ASSERT_TRUE(ecs.HasComponent<TECS::Player>(e));

@@ -4,6 +4,7 @@
 #include "TIndexFreeList.h"
 #include "THandleFreeList.h"
 #include "TSparseSet.h"
+#include "TSparseSet2.h"
 #include "TSparseTagSet.h"
 #include "TSparseTagSet2.h"
 

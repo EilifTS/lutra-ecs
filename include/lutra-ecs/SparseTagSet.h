@@ -35,7 +35,6 @@ namespace lcs
 		constexpr static u32 invalid_index{ u32(-1) };
 
 		inline bool isValidInputIndex(u32 index) const;
-		inline void inflateSparseSet(u32 new_size);
 
 		std::vector<u32> sparse_indices;
 		std::vector<u32> inverse_list;

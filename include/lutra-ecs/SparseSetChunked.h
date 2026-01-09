@@ -95,7 +95,7 @@ namespace lcs
 		{
 			/* Remove the chunk */
 			assert(chunks.size() > 0);
-			const auto back_chunk_index = handle_t::data_t(chunks.size()) - 1;
+			const auto back_chunk_index = typename handle_t::data_t(chunks.size()) - 1;
 			const auto back_index = inverse_handle_chunks[back_chunk_index][data_index].GetIndex();
 
 			if (back_chunk_index != chunk_index)

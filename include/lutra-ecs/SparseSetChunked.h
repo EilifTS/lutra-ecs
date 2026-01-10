@@ -1,5 +1,6 @@
 #pragma once
 #include <lutra-ecs/Handle.h>
+#include <lutra-ecs/BitMask.h>
 #include <algorithm>
 #include <cassert>
 #include <utility>
@@ -35,7 +36,7 @@ namespace lcs
 		constexpr static data_t invalid_index{ data_t(-1) };
 
 		std::vector<data_t> chunk_indices{};
-		std::vector<uint64_t> occupancy_masks{};
+		std::vector<BitMask<uint64_t>> occupancy_masks{};
 		std::vector<InverseHandlesChunk> inverse_handle_chunks{};
 		std::vector<Chunk> chunks{};
 	};
@@ -52,17 +53,17 @@ namespace lcs
 			/* Add new chunk */
 			chunk_index = chunks.size();
 			chunk_indices[handle_index / 64] = chunk_index;
-			occupancy_masks.push_back(0);
+			occupancy_masks.push_back({ 0 });
 			inverse_handle_chunks.push_back({});
 			chunks.push_back({});
 		}
 
-		uint64_t& occupancy_mask = occupancy_masks[chunk_index];
+		BitMask<uint64_t>& occupancy_mask = occupancy_masks[chunk_index];
 		InverseHandlesChunk& inverse_handle_chunk = inverse_handle_chunks[chunk_index];
 		Chunk& chunk = chunks[chunk_index];
 
 		const auto data_index = handle.GetIndex() % 64;
-		occupancy_mask |= (uint64_t(1) << data_index);
+		occupancy_mask.SetBit(uint8_t(data_index));
 		inverse_handle_chunk[data_index] = handle;
 		chunk[data_index] = data;
 	}
@@ -88,10 +89,10 @@ namespace lcs
 		const auto data_index = handle_index % 64;
 
 
-		uint64_t& occupancy_mask = occupancy_masks[chunk_index];
-		occupancy_mask &= ~(uint64_t(1) << data_index);
+		BitMask<uint64_t>& occupancy_mask = occupancy_masks[chunk_index];
+		occupancy_mask.ClearBit(uint8_t(data_index));
 
-		if (occupancy_mask == 0)
+		if (occupancy_mask.IsZero())
 		{
 			/* Remove the chunk */
 			assert(chunks.size() > 0);
@@ -130,7 +131,7 @@ namespace lcs
 
 		const auto data_index = handle_index % 64;
 		const auto occupancy_mask = occupancy_masks[chunk_index];
-		if ((occupancy_mask & (uint64_t(1) << data_index)) == 0) return false;
+		if (!occupancy_mask.IsBitSet(uint8_t(data_index))) return false;
 
 		const InverseHandlesChunk& inverse_handle_chunk = inverse_handle_chunks[chunk_index];
 		assert(inverse_handle_chunk[data_index].GetValidationID() == handle.GetValidationID()); /* Check for stale handle */

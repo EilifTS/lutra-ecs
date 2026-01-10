@@ -22,6 +22,13 @@ namespace lcs
 			mask &= ~(T(1) << T(bit));
 		}
 
+		inline bool IsBitSet(uint8_t bit) const
+		{
+			return (mask & (T(1) << bit)) != 0;
+		}
+
+		inline bool IsZero() const { return mask == T(0); };
+
 		class Iterator
 		{
 		public:

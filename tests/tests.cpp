@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "TBitMask.h"
 #include "TECS.h"
 #include "THandleFreeList.h"
 #include "TSparseSet.h"

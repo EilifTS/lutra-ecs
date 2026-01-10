@@ -1,4 +1,5 @@
 file(GLOB TEST_INCLUDES
+    TBitMask.h
     TECS.h
     THandleFreeList.h
     TSparseSet.h

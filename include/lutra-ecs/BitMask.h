@@ -66,6 +66,7 @@ namespace lcs
 				Iterator tmp = *this; --(*this); return tmp;
 			}
 
+			inline bool IsZero() const { return mask.IsZero(); };
 			friend bool operator== (const Iterator& a, const Iterator& b) { return a.mask.mask == b.mask.mask; };
 			friend bool operator!= (const Iterator& a, const Iterator& b) { return a.mask.mask != b.mask.mask; };
 		private:

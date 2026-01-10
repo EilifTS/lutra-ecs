@@ -100,3 +100,24 @@ TEST(SparseSetChunked, TestInsertRemoveInsert2)
 	ASSERT_TRUE(set.Get(cnh(1)) == 3);
 	ASSERT_TRUE(set.Get(cnh(2)) == 2);
 }
+
+TEST(SparseSetChunked, TestIteration)
+{
+	lcs::SparseSetChunked<TestHandle, u64> set{};
+	set.ReserveSparseSize(16);
+
+	set.Add(cnh(5), 1);
+	set.Add(cnh(10), 2);
+	set.Add(cnh(15), 3);
+
+	uint32_t index_sum = 0;
+	u64 data_sum = 0;
+	for (auto it = set.begin(); it != set.end(); ++it)
+	{
+		index_sum += it.GetOwner().GetIndex();
+		data_sum += *it;
+	}
+	ASSERT_TRUE(index_sum == 30);
+	ASSERT_TRUE(data_sum == 6);
+}
+

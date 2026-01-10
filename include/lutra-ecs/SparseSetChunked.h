@@ -32,6 +32,64 @@ namespace lcs
 		inline void ReserveSparseSize(data_t new_size);
 		inline void Clear();
 
+		class Iterator
+		{
+		public:
+			inline T& operator*() const { return owner.chunks[chunk_index][*occ_it]; }
+			inline T* operator->() { return &(owner.chunks[chunk_index][*occ_it]); }
+
+			inline handle_t GetOwner() const { return owner.inverse_handle_chunks[chunk_index][*occ_it]; };
+
+			inline Iterator& operator++() 
+			{
+				++occ_it;
+				if (occ_it.IsZero())
+				{
+					chunk_index++;
+					if (chunk_index < owner.chunks.size())
+					{
+						occ_it = BitMask<uint64_t>::Iterator::Create(owner.occupancy_masks[chunk_index]);
+					}
+				}
+				return *this;
+			}
+
+			inline Iterator operator++(int)
+			{
+				Iterator tmp = *this; ++(*this); return tmp;
+			}
+
+			friend bool operator== (const Iterator& a, const Iterator& b)
+			{
+				return (a.chunk_index == b.chunk_index) && (a.occ_it == b.occ_it);
+			};
+			friend bool operator!= (const Iterator& a, const Iterator& b)
+			{
+				return (a.chunk_index != b.chunk_index) || (a.occ_it != b.occ_it);
+			};
+		private:
+			inline Iterator(SparseSetChunked& owner, data_t chunk_index) 
+				: chunk_index(chunk_index), occ_it(occ_it), owner(owner)
+			{
+				if (owner.occupancy_masks.size() > 0 && chunk_index < owner.occupancy_masks.size())
+				{
+					occ_it = BitMask<uint64_t>::Iterator::Create(owner.occupancy_masks[chunk_index]);
+				}
+				else
+				{
+					occ_it = BitMask<uint64_t>::Iterator::Create({});
+				}
+			}
+			data_t chunk_index{};
+			BitMask<uint64_t>::Iterator occ_it{};
+			SparseSetChunked& owner;
+
+			friend class SparseSetChunked;
+		};
+		inline Iterator begin() { return Iterator(*this, 0); };
+		inline Iterator end() { return Iterator(*this, chunks.size()); };
+
+
 	private:
 		constexpr static data_t invalid_index{ data_t(-1) };
 

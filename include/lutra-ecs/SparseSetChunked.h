@@ -69,15 +69,11 @@ namespace lcs
 			};
 		private:
 			inline Iterator(SparseSetChunked& owner, data_t chunk_index) 
-				: chunk_index(chunk_index), occ_it(occ_it), owner(owner)
+				: chunk_index(chunk_index), owner(owner)
 			{
 				if (owner.occupancy_masks.size() > 0 && chunk_index < owner.occupancy_masks.size())
 				{
 					occ_it = BitMask<uint64_t>::Iterator::Create(owner.occupancy_masks[chunk_index]);
-				}
-				else
-				{
-					occ_it = BitMask<uint64_t>::Iterator::Create({});
 				}
 			}
 			data_t chunk_index{};

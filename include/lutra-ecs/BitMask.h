@@ -32,6 +32,7 @@ namespace lcs
 		class Iterator
 		{
 		public:
+			inline Iterator() {};
 			inline Iterator(BitMask mask, uint8_t first_index) : mask(mask), current_index(first_index) {};
 
 			inline static Iterator Create(BitMask mask)

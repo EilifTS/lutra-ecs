@@ -7,7 +7,7 @@
 
 namespace becs
 {
-	using EntityID = lcs::Handle<uint32_t, 16>;
+	using EntityID = lcs::Handle<uint32_t, 8>;
 
 	struct Position
 	{
@@ -22,6 +22,41 @@ namespace becs
 	struct Player
 	{
 		static constexpr lcs::ComponentType component_type = lcs::ComponentType::Component;
+		bool is_happy;
+		bool is_hungry;
+		bool is_here;
+		bool is_there;
+	};
+
+	using ECS = lcs::ECSManager<EntityID, Position, Velocity, Player>;
+
+	inline EntityID CreatePlayer(ECS& ecs, int x, int y)
+	{
+		auto entity = ecs.CreateEntity();
+		ecs.AddComponent<Position>(entity, { x, y });
+		ecs.AddComponent<Velocity>(entity, { 0, 1 });
+		ecs.AddComponent<Player>(entity, { true, true, true, true });
+		return entity;
+	}
+}
+
+namespace becs2
+{
+	using EntityID = lcs::Handle<uint32_t, 8>;
+
+	struct Position
+	{
+		static constexpr lcs::ComponentType component_type = lcs::ComponentType::ComponentChunked;
+		int x, y;
+	};
+	struct Velocity
+	{
+		static constexpr lcs::ComponentType component_type = lcs::ComponentType::ComponentChunked;
+		int x, y;
+	};
+	struct Player
+	{
+		static constexpr lcs::ComponentType component_type = lcs::ComponentType::ComponentChunked;
 		bool is_happy;
 		bool is_hungry;
 		bool is_here;
@@ -64,6 +99,39 @@ static void BenchmarkECS(benchmark::State& state)
 			if (ecs.HasComponent<becs::Velocity>(e))
 			{
 				becs::Velocity& v = ecs.GetComponent<becs::Velocity>(e);
+				p.x += v.x;
+				p.y += v.y;
+			}
+		}
+	}
+
+	ecs.Clear();
+}
+
+static void BenchmarkECSChunked(benchmark::State& state)
+{
+	const uint32_t player_count = state.range(0);
+
+	becs2::ECS ecs{};
+
+	std::vector<becs2::EntityID> players;
+	std::vector<becs2::Position> positions(player_count);
+	std::vector<becs2::Velocity> velocities(player_count);
+
+	for (uint32_t i = 0; i < player_count; i++)
+	{
+		players.push_back(becs2::CreatePlayer(ecs, 1, i));
+		positions[i] = { 1, (int)i };
+		velocities[i] = { 0, 1 };
+	}
+
+	for (auto _ : state)
+	{
+		for (auto [e, p] : ecs.CView<becs2::Position>())
+		{
+			if (ecs.HasComponent<becs2::Velocity>(e))
+			{
+				becs2::Velocity& v = ecs.GetComponent<becs2::Velocity>(e);
 				p.x += v.x;
 				p.y += v.y;
 			}

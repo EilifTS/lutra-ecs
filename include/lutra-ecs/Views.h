@@ -6,17 +6,48 @@
 
 namespace lcs
 {
+	enum class ComponentType
+	{
+		Component, ComponentChunked, Tag
+	};
+
+	namespace internal_ecs
+	{
+		template <typename EntityID, typename T, ComponentType type>
+		struct GetComponentContainer;
+
+		template <typename EntityID, typename T>
+		struct GetComponentContainer<EntityID, T, ComponentType::Component>
+		{
+			using Container = SparseSet<EntityID, T>;
+		};
+
+		template <typename EntityID, typename T>
+		struct GetComponentContainer<EntityID, T, ComponentType::ComponentChunked>
+		{
+			using Container = SparseSetChunked<EntityID, T>;
+		};
+
+		template <typename EntityID, typename T>
+		struct GetComponentContainer<EntityID, T, ComponentType::Tag>
+		{
+			using Container = SparseTagSetT<EntityID, T>;
+		};
+	}
+
 	template <typename EntityID, typename T>
 	class ComponentView
 	{
+		using SetType = typename internal_ecs::GetComponentContainer<EntityID, T, T::component_type>::Container;
+
 	public:
-		ComponentView(SparseSet<EntityID, T>& set) : set(set) {};
+		ComponentView(SetType& set) : set(set) {};
 
 		class Iterator
 		{
 		public:
 			/* Constructor */
-			Iterator(SparseSet<EntityID, T>::Iterator it) : set_iterator(it) {};
+			Iterator(SetType::Iterator it) : set_iterator(it) {};
 
 			/* Class for enabling arrow operator on temporary return object */
 			class ArrowHelper
@@ -42,14 +73,14 @@ namespace lcs
 			friend bool operator!= (const Iterator& a, const Iterator& b) { return a.set_iterator != b.set_iterator; };
 
 		private:
-			SparseSet<EntityID, T>::Iterator set_iterator;
+			SetType::Iterator set_iterator;
 		};
 
 		inline Iterator begin();
 		inline Iterator end();
 
 	private:
-		SparseSet<EntityID, T>& set;
+		SetType& set;
 	};
 
 	template <typename EntityID, typename T>

@@ -1,5 +1,6 @@
 #pragma once
 #include <lutra-ecs/SparseSet.h>
+#include <lutra-ecs/SparseSetChunked.h>
 #include <lutra-ecs/HandleFreeList.h>
 #include <lutra-ecs/SparseTagSet.h>
 #include <lutra-ecs/Views.h>
@@ -11,29 +12,6 @@
 
 namespace lcs
 {
-	enum class ComponentType
-	{
-		Component, Tag
-	};
-
-	namespace internal_ecs
-	{
-		template <typename EntityID, typename T, ComponentType type>
-		struct GetComponentContainer;
-
-		template <typename EntityID, typename T>
-		struct GetComponentContainer<EntityID, T, ComponentType::Component>
-		{
-			using Container = SparseSet<EntityID, T>;
-		};
-
-		template <typename EntityID, typename T>
-		struct GetComponentContainer<EntityID, T, ComponentType::Tag>
-		{
-			using Container = SparseTagSetT<EntityID, T>;
-		};
-	}
-
 	template <typename handle_t, typename... Ts>
 	class ECSManager
 	{
@@ -101,14 +79,16 @@ namespace lcs
 	template <typename EntityID, typename... Ts> template <typename T>
 	inline bool ECSManager<EntityID, Ts...>::HasComponent(EntityID id)
 	{
-		SparseSet<EntityID, T>& set = std::get<SparseSet<EntityID, T>>(component_sets);
+		using SetType = typename internal_ecs::GetComponentContainer<EntityID, T, T::component_type>::Container;
+		SetType& set = std::get<SetType>(component_sets);
 		return set.Has(id);
 	}
 
 	template <typename EntityID, typename... Ts> template <typename T>
 	inline T& ECSManager<EntityID, Ts...>::GetComponent(EntityID id)
 	{
-		SparseSet<EntityID, T>& set = std::get<SparseSet<EntityID, T>>(component_sets);
+		using SetType = typename internal_ecs::GetComponentContainer<EntityID, T, T::component_type>::Container;
+		SetType& set = std::get<SetType>(component_sets);
 		return set.Get(id);
 	}
 
@@ -116,7 +96,8 @@ namespace lcs
 	inline std::remove_reference<T>::type& ECSManager<EntityID, Ts...>::AddComponent(EntityID id, T&& component)
 	{
 		using Tp = std::remove_reference<T>::type;
-		SparseSet<EntityID, Tp>& set = std::get<SparseSet<EntityID, Tp>>(component_sets);
+		using SetType = typename internal_ecs::GetComponentContainer<EntityID, T, T::component_type>::Container;
+		SetType& set = std::get<SetType>(component_sets);
 		set.Add(id, std::forward<T>(component));
 		return GetComponent<Tp>(id);
 	}
@@ -125,21 +106,24 @@ namespace lcs
 	inline void ECSManager<EntityID, Ts...>::RemoveComponent(EntityID id)
 	{
 		assert(HasComponent<T>(id));
-		SparseSet<EntityID, T>& set = std::get<SparseSet<EntityID, T>>(component_sets);
+		using SetType = typename internal_ecs::GetComponentContainer<EntityID, T, T::component_type>::Container;
+		SetType& set = std::get<SetType>(component_sets);
 		return set.Remove(id);
 	}
 
 	template <typename EntityID, typename... Ts> template <typename T>
 	inline EntityID::data_t ECSManager<EntityID, Ts...>::GetComponentCount()
 	{
-		SparseSet<EntityID, T>& set = std::get<SparseSet<EntityID, T>>(component_sets);
+		using SetType = typename internal_ecs::GetComponentContainer<EntityID, T, T::component_type>::Container;
+		SetType& set = std::get<SetType>(component_sets);
 		return set.Size();
 	}
 
 	template <typename EntityID, typename... Ts> template <typename T>
 	inline ComponentView<EntityID, T> ECSManager<EntityID, Ts...>::CView()
 	{
-		SparseSet<EntityID, T>& set = std::get<SparseSet<EntityID, T>>(component_sets);
+		using SetType = typename internal_ecs::GetComponentContainer<EntityID, T, T::component_type>::Container;
+		SetType& set = std::get<SetType>(component_sets);
 		return ComponentView<EntityID, T>(set);
 	}
 

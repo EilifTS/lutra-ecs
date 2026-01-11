@@ -195,9 +195,11 @@ namespace lcs
 	template <typename handle_t, typename T>
 	inline void SparseSetChunked<handle_t, T>::ReserveSparseSize(handle_t::data_t new_size)
 	{
-		assert(new_size > SparseSize());
-		const auto new_size_aligned = (new_size / 64) + 1;
-		chunk_indices.resize(size_t(new_size_aligned), invalid_index);
+		if (new_size > SparseSize())
+		{
+			const auto new_size_aligned = (new_size / 64) + 1;
+			chunk_indices.resize(size_t(new_size_aligned), invalid_index);
+		}
 	}
 
 	template <typename handle_t, typename T>

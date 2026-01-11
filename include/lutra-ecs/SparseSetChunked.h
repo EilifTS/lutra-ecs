@@ -13,9 +13,12 @@ namespace lcs
 	class SparseSetChunked
 	{
 	public:
+		using bit_t = uint64_t;
 		using data_t = handle_t::data_t;
-		using InverseHandlesChunk = std::array<handle_t, 64>;
-		using Chunk = std::array<T, 64>;
+
+		static constexpr data_t entries_per_chunk = sizeof(bit_t) * 8;
+		using InverseHandlesChunk = std::array<handle_t, entries_per_chunk>;
+		using Chunk = std::array<T, entries_per_chunk>;
 
 		SparseSetChunked() {};
 
@@ -26,8 +29,8 @@ namespace lcs
 		inline void RemoveIfPresent(handle_t handle);
 		inline bool Has(handle_t handle) const;
 
-		inline data_t SparseSize() const { return data_t(chunk_indices.size() * 64); };
-		inline data_t DenseSize() const { return data_t(chunks.size()) * 64; };
+		inline data_t SparseSize() const { return data_t(chunk_indices.size() * entries_per_chunk); };
+		inline data_t DenseSize() const { return data_t(chunks.size()) * entries_per_chunk; };
 
 		inline void ReserveSparseSize(data_t new_size);
 		inline void Clear();
@@ -48,7 +51,7 @@ namespace lcs
 					chunk_index++;
 					if (chunk_index < owner.chunks.size())
 					{
-						occ_it = BitMask<uint64_t>::Iterator::Create(owner.occupancy_masks[chunk_index]);
+						occ_it = BitMask<bit_t>::Iterator::Create(owner.occupancy_masks[chunk_index]);
 					}
 				}
 				return *this;
@@ -73,11 +76,11 @@ namespace lcs
 			{
 				if (owner.occupancy_masks.size() > 0 && chunk_index < owner.occupancy_masks.size())
 				{
-					occ_it = BitMask<uint64_t>::Iterator::Create(owner.occupancy_masks[chunk_index]);
+					occ_it = BitMask<bit_t>::Iterator::Create(owner.occupancy_masks[chunk_index]);
 				}
 			}
 			data_t chunk_index{};
-			BitMask<uint64_t>::Iterator occ_it{};
+			BitMask<bit_t>::Iterator occ_it{};
 			SparseSetChunked& owner;
 
 			friend class SparseSetChunked;
@@ -90,7 +93,7 @@ namespace lcs
 		constexpr static data_t invalid_index{ data_t(-1) };
 
 		std::vector<data_t> chunk_indices{};
-		std::vector<BitMask<uint64_t>> occupancy_masks{};
+		std::vector<BitMask<bit_t>> occupancy_masks{};
 		std::vector<InverseHandlesChunk> inverse_handle_chunks{};
 		std::vector<Chunk> chunks{};
 	};
@@ -101,22 +104,22 @@ namespace lcs
 		assert(!Has(handle));
 		const auto handle_index = handle.GetIndex();
 
-		auto chunk_index = chunk_indices[handle_index / 64];
+		auto chunk_index = chunk_indices[handle_index / entries_per_chunk];
 		if (chunk_index == invalid_index)
 		{
 			/* Add new chunk */
 			chunk_index = chunks.size();
-			chunk_indices[handle_index / 64] = chunk_index;
+			chunk_indices[handle_index / entries_per_chunk] = chunk_index;
 			occupancy_masks.push_back({ 0 });
 			inverse_handle_chunks.push_back({});
 			chunks.push_back({});
 		}
 
-		BitMask<uint64_t>& occupancy_mask = occupancy_masks[chunk_index];
+		auto& occupancy_mask = occupancy_masks[chunk_index];
 		InverseHandlesChunk& inverse_handle_chunk = inverse_handle_chunks[chunk_index];
 		Chunk& chunk = chunks[chunk_index];
 
-		const auto data_index = handle.GetIndex() % 64;
+		const auto data_index = handle.GetIndex() % entries_per_chunk;
 		occupancy_mask.SetBit(uint8_t(data_index));
 		inverse_handle_chunk[data_index] = handle;
 		chunk[data_index] = data;
@@ -128,8 +131,8 @@ namespace lcs
 		assert(Has(handle));
 
 		const auto handle_index = handle.GetIndex();
-		const auto chunk_index = chunk_indices[handle_index / 64];
-		const auto data_index = handle_index % 64;
+		const auto chunk_index = chunk_indices[handle_index / entries_per_chunk];
+		const auto data_index = handle_index % entries_per_chunk;
 		return chunks[chunk_index][data_index];
 	}
 
@@ -139,11 +142,11 @@ namespace lcs
 		assert(Has(handle));
 
 		const auto handle_index = handle.GetIndex();
-		const auto chunk_index = chunk_indices[handle_index / 64];
-		const auto data_index = handle_index % 64;
+		const auto chunk_index = chunk_indices[handle_index / entries_per_chunk];
+		const auto data_index = handle_index % entries_per_chunk;
 
 
-		BitMask<uint64_t>& occupancy_mask = occupancy_masks[chunk_index];
+		auto& occupancy_mask = occupancy_masks[chunk_index];
 		occupancy_mask.ClearBit(uint8_t(data_index));
 
 		if (occupancy_mask.IsZero())
@@ -178,12 +181,12 @@ namespace lcs
 	bool SparseSetChunked<handle_t, T>::Has(handle_t handle) const
 	{
 		const auto handle_index = handle.GetIndex();
-		assert(handle_index / 64 < chunk_indices.size());
+		assert(handle_index / entries_per_chunk < chunk_indices.size());
 
-		const auto chunk_index = chunk_indices[handle_index / 64];
+		const auto chunk_index = chunk_indices[handle_index / entries_per_chunk];
 		if (chunk_index == invalid_index) return false;
 
-		const auto data_index = handle_index % 64;
+		const auto data_index = handle_index % entries_per_chunk;
 		const auto occupancy_mask = occupancy_masks[chunk_index];
 		if (!occupancy_mask.IsBitSet(uint8_t(data_index))) return false;
 
@@ -197,7 +200,7 @@ namespace lcs
 	{
 		if (new_size > SparseSize())
 		{
-			const auto new_size_aligned = (new_size / 64) + 1;
+			const auto new_size_aligned = (new_size / entries_per_chunk) + 1;
 			chunk_indices.resize(size_t(new_size_aligned), invalid_index);
 		}
 	}

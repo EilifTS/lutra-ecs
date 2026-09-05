@@ -272,6 +272,66 @@ TEST(ECS, TestGetComponentData)
 	ecs.Clear();
 }
 
+TEST(ECS, TestClearComponent)
+{
+	TECS::ECS ecs{ };
+
+	TECS::EntityID e1 = TECS::CreatePlayer(ecs, 2, 1);
+	TECS::EntityID e2 = TECS::CreateEnemy(ecs, 1, 1);
+	ecs.AddTag<TECS::IsWet>(e1);
+
+	ASSERT_TRUE(ecs.GetComponentCount<TECS::Position>() == 2);
+	ASSERT_TRUE(ecs.GetComponentCount<TECS::Velocity>() == 2);
+
+	ecs.ClearComponent<TECS::Position>();
+
+	ASSERT_TRUE(ecs.GetComponentCount<TECS::Position>() == 0);
+	ASSERT_TRUE(!ecs.HasComponent<TECS::Position>(e1));
+	ASSERT_TRUE(!ecs.HasComponent<TECS::Position>(e2));
+
+	/* Unrelated components/tags are untouched */
+	ASSERT_TRUE(ecs.GetComponentCount<TECS::Velocity>() == 2);
+	ASSERT_TRUE(ecs.HasComponent<TECS::Velocity>(e1));
+	ASSERT_TRUE(ecs.HasTag<TECS::IsWet>(e1));
+
+	/* Capacity for existing entities is preserved, so re-adding still works */
+	ecs.AddComponent<TECS::Position>(e1, { 5, 5 });
+	ASSERT_TRUE(ecs.HasComponent<TECS::Position>(e1));
+	ASSERT_TRUE(ecs.GetComponent<TECS::Position>(e1).x == 5);
+	ASSERT_TRUE(ecs.GetComponentCount<TECS::Position>() == 1);
+
+	ecs.Clear();
+}
+
+TEST(ECS, TestClearTag)
+{
+	TECS::ECS ecs{ };
+
+	TECS::EntityID e1 = TECS::CreatePlayer(ecs, 2, 1);
+	TECS::EntityID e2 = TECS::CreateEnemy(ecs, 1, 1);
+	ecs.AddTag<TECS::IsWet>(e1);
+	ecs.AddTag<TECS::IsWet>(e2);
+
+	ASSERT_TRUE(ecs.HasTag<TECS::IsWet>(e1));
+	ASSERT_TRUE(ecs.HasTag<TECS::IsWet>(e2));
+
+	ecs.ClearTag<TECS::IsWet>();
+
+	ASSERT_TRUE(!ecs.HasTag<TECS::IsWet>(e1));
+	ASSERT_TRUE(!ecs.HasTag<TECS::IsWet>(e2));
+
+	/* Unrelated components are untouched */
+	ASSERT_TRUE(ecs.HasComponent<TECS::Position>(e1));
+	ASSERT_TRUE(ecs.HasComponent<TECS::Position>(e2));
+
+	/* Capacity for existing entities is preserved, so re-adding still works */
+	ecs.AddTag<TECS::IsWet>(e1);
+	ASSERT_TRUE(ecs.HasTag<TECS::IsWet>(e1));
+	ASSERT_TRUE(!ecs.HasTag<TECS::IsWet>(e2));
+
+	ecs.Clear();
+}
+
 TEST(ECS, TestTagCreation)
 {
 	TECS::ECS ecs{ };

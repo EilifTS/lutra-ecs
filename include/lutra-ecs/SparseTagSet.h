@@ -25,6 +25,7 @@ namespace lcs
 
 		inline void ReserveSparseSize(data_t new_size);
 		inline void Clear();
+		inline void ClearDense();
 
 		using Iterator = std::vector<handle_t>::iterator;
 		
@@ -105,6 +106,13 @@ namespace lcs
 	inline void SparseTagSet<handle_t>::Clear()
 	{
 		sparse_indices.clear();
+		inverse_list.clear();
+	}
+
+	template <typename handle_t>
+	inline void SparseTagSet<handle_t>::ClearDense()
+	{
+		std::fill(sparse_indices.begin(), sparse_indices.end(), invalid_index);
 		inverse_list.clear();
 	}
 

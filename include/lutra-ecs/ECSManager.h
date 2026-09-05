@@ -32,6 +32,7 @@ namespace lcs
 		template <typename T> inline T& GetComponent(EntityID id);
 		template <typename T> inline std::remove_reference<T>::type& AddComponent(EntityID id, T&& component);
 		template <typename T> inline void RemoveComponent(EntityID id);
+		template <typename T> inline void ClearComponent();
 		template <typename T> inline EntityID::data_t GetComponentCount();
 		template <typename T> inline std::span<T> GetComponentData();
 		template <typename T> inline ComponentView<EntityID, T> CView();
@@ -40,6 +41,7 @@ namespace lcs
 		template <typename T> inline bool HasTag(EntityID id);
 		template <typename T> inline void AddTag(EntityID id);
 		template <typename T> inline void RemoveTag(EntityID id);
+		template <typename T> inline void ClearTag();
 		template <typename T> inline TagView<EntityID, T> TView();
 		/* template <typename T> inline u32 GetTagCount(); */
 
@@ -114,6 +116,15 @@ namespace lcs
 	}
 
 	template <typename EntityID, typename... Ts> template <typename T>
+	inline void ECSManager<EntityID, Ts...>::ClearComponent()
+	{
+		static_assert(T::component_type != ComponentType::Tag, "ClearComponent is not supported for tag types, use ClearTag instead");
+		using SetType = typename internal_ecs::GetComponentContainer<EntityID, T, T::component_type>::Container;
+		SetType& set = std::get<SetType>(component_sets);
+		set.ClearDense();
+	}
+
+	template <typename EntityID, typename... Ts> template <typename T>
 	inline EntityID::data_t ECSManager<EntityID, Ts...>::GetComponentCount()
 	{
 		using SetType = typename internal_ecs::GetComponentContainer<EntityID, T, T::component_type>::Container;
@@ -157,6 +168,13 @@ namespace lcs
 	{
 		SparseTagSetT<EntityID, T>& set = std::get<SparseTagSetT<EntityID, T>>(component_sets);
 		return set.Remove(id);
+	}
+
+	template <typename EntityID, typename... Ts> template <typename T>
+	void ECSManager<EntityID, Ts...>::ClearTag()
+	{
+		SparseTagSetT<EntityID, T>& set = std::get<SparseTagSetT<EntityID, T>>(component_sets);
+		set.ClearDense();
 	}
 
 	template <typename EntityID, typename... Ts> template <typename T>

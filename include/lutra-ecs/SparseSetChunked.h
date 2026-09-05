@@ -34,6 +34,7 @@ namespace lcs
 
 		inline void ReserveSparseSize(data_t new_size);
 		inline void Clear();
+		inline void ClearDense();
 
 		class Iterator
 		{
@@ -209,6 +210,15 @@ namespace lcs
 	inline void SparseSetChunked<handle_t, T>::Clear()
 	{
 		chunk_indices.clear();
+		occupancy_masks.clear();
+		inverse_handle_chunks.clear();
+		chunks.clear();
+	}
+
+	template <typename handle_t, typename T>
+	inline void SparseSetChunked<handle_t, T>::ClearDense()
+	{
+		std::fill(chunk_indices.begin(), chunk_indices.end(), invalid_index);
 		occupancy_masks.clear();
 		inverse_handle_chunks.clear();
 		chunks.clear();

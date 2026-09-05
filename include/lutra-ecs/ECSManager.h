@@ -116,7 +116,7 @@ namespace lcs
 	{
 		using SetType = typename internal_ecs::GetComponentContainer<EntityID, T, T::component_type>::Container;
 		SetType& set = std::get<SetType>(component_sets);
-		return set.Size();
+		return set.DenseSize();
 	}
 
 	template <typename EntityID, typename... Ts> template <typename T>

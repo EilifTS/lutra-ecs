@@ -220,6 +220,37 @@ TEST(ECS, TestSparseSystem)
 	ecs.Clear();
 }
 
+TEST(ECS, TestGetComponentCount)
+{
+	TECS::ECS ecs{ };
+
+	ASSERT_TRUE(ecs.GetComponentCount<TECS::Position>() == 0);
+	ASSERT_TRUE(ecs.GetComponentCount<TECS::Enemy>() == 0);
+
+	TECS::EntityID e1 = TECS::CreatePlayer(ecs, 2, 1);
+	ASSERT_TRUE(ecs.GetComponentCount<TECS::Position>() == 1);
+	ASSERT_TRUE(ecs.GetComponentCount<TECS::Velocity>() == 1);
+	ASSERT_TRUE(ecs.GetComponentCount<TECS::Player>() == 1);
+	ASSERT_TRUE(ecs.GetComponentCount<TECS::Enemy>() == 0);
+
+	TECS::EntityID e2 = TECS::CreateEnemy(ecs, 1, 1);
+	ASSERT_TRUE(ecs.GetComponentCount<TECS::Position>() == 2);
+	ASSERT_TRUE(ecs.GetComponentCount<TECS::Velocity>() == 2);
+	ASSERT_TRUE(ecs.GetComponentCount<TECS::Player>() == 1);
+	ASSERT_TRUE(ecs.GetComponentCount<TECS::Enemy>() == 1);
+
+	ecs.RemoveComponent<TECS::Velocity>(e1);
+	ASSERT_TRUE(ecs.GetComponentCount<TECS::Velocity>() == 1);
+
+	ecs.DestroyEntity(e2);
+	ASSERT_TRUE(ecs.GetComponentCount<TECS::Position>() == 1);
+	ASSERT_TRUE(ecs.GetComponentCount<TECS::Velocity>() == 0);
+	ASSERT_TRUE(ecs.GetComponentCount<TECS::Enemy>() == 0);
+
+	ecs.Clear();
+	ASSERT_TRUE(ecs.GetComponentCount<TECS::Position>() == 0);
+}
+
 TEST(ECS, TestTagCreation)
 {
 	TECS::ECS ecs{ };

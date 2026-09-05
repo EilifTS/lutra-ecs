@@ -2,6 +2,7 @@
 #include <lutra-ecs/Handle.h>
 #include <algorithm>
 #include <cassert>
+#include <span>
 #include <utility>
 #include <vector>
 
@@ -24,6 +25,9 @@ namespace lcs
 
 		inline data_t SparseSize() const { return data_t(sparse_indices.size()); };
 		inline data_t DenseSize() const { return data_t(dense_data.size()); };
+
+		inline std::span<T> Data() { return std::span<T>(dense_data); };
+		inline std::span<const T> Data() const { return std::span<const T>(dense_data); };
 
 		inline void ReserveSparseSize(data_t new_size);
 		inline void Clear();

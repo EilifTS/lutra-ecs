@@ -6,6 +6,7 @@
 #include <lutra-ecs/Views.h>
 #include <algorithm>
 #include <array>
+#include <span>
 #include <type_traits>
 #include <vector>
 #include <tuple>
@@ -32,6 +33,7 @@ namespace lcs
 		template <typename T> inline std::remove_reference<T>::type& AddComponent(EntityID id, T&& component);
 		template <typename T> inline void RemoveComponent(EntityID id);
 		template <typename T> inline EntityID::data_t GetComponentCount();
+		template <typename T> inline std::span<T> GetComponentData();
 		template <typename T> inline ComponentView<EntityID, T> CView();
 
 		/* Tag */
@@ -117,6 +119,15 @@ namespace lcs
 		using SetType = typename internal_ecs::GetComponentContainer<EntityID, T, T::component_type>::Container;
 		SetType& set = std::get<SetType>(component_sets);
 		return set.DenseSize();
+	}
+
+	template <typename EntityID, typename... Ts> template <typename T>
+	inline std::span<T> ECSManager<EntityID, Ts...>::GetComponentData()
+	{
+		static_assert(T::component_type == ComponentType::Component, "GetComponentData is not supported for chunked or tag component types, since their dense storage is not one contiguous array");
+		using SetType = typename internal_ecs::GetComponentContainer<EntityID, T, T::component_type>::Container;
+		SetType& set = std::get<SetType>(component_sets);
+		return set.Data();
 	}
 
 	template <typename EntityID, typename... Ts> template <typename T>

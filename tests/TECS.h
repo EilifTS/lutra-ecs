@@ -251,6 +251,27 @@ TEST(ECS, TestGetComponentCount)
 	ASSERT_TRUE(ecs.GetComponentCount<TECS::Position>() == 0);
 }
 
+TEST(ECS, TestGetComponentData)
+{
+	TECS::ECS ecs{ };
+
+	TECS::EntityID e1 = TECS::CreatePlayer(ecs, 2, 1);
+	TECS::EntityID e2 = TECS::CreateEnemy(ecs, 1, 1);
+
+	std::span<TECS::Position> data = ecs.GetComponentData<TECS::Position>();
+	ASSERT_TRUE(data.data() != nullptr);
+	ASSERT_TRUE(data.size() == 2);
+	ASSERT_TRUE(ecs.GetComponentCount<TECS::Position>() == 2);
+
+	/* Data() points at the same dense storage backing Get() */
+	ASSERT_TRUE(&data[0] == &ecs.GetComponent<TECS::Position>(e1));
+	ASSERT_TRUE(&data[1] == &ecs.GetComponent<TECS::Position>(e2));
+	ASSERT_TRUE(data[0].x == 2 && data[0].y == 1);
+	ASSERT_TRUE(data[1].x == 1 && data[1].y == 1);
+
+	ecs.Clear();
+}
+
 TEST(ECS, TestTagCreation)
 {
 	TECS::ECS ecs{ };

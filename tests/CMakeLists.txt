@@ -1,21 +1,18 @@
-file(GLOB TEST_INCLUDES
+add_executable(tests
+    tests.cpp
     TBitMask.h
     TECS.h
     THandleFreeList.h
     TSparseSet.h
-    TSparseSetChunked.h
     TSparseTagSet.h
 )
-
-file(GLOB TEST_SOURCES
-    tests.cpp
-)
-
-add_executable(tests ${TEST_SOURCES})
 target_compile_features(tests PRIVATE cxx_std_20)
-target_include_directories(tests PRIVATE ${PROJECT_SOURCE_DIR}/src)
-target_link_libraries(tests PRIVATE lutra-ecs GTest::gtest)
+if (MSVC)
+    target_compile_options(tests PRIVATE /W4)
+else()
+    target_compile_options(tests PRIVATE -Wall -Wextra)
+endif()
+target_link_libraries(tests PRIVATE lutra-ecs::lutra-ecs GTest::gtest)
 
-enable_testing()
 include(GoogleTest)
 gtest_discover_tests(tests)

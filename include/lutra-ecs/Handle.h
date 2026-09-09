@@ -16,8 +16,8 @@ namespace lcs
 		static constexpr data_t max_index = (data_t(1) << index_bits) - data_t(1);
 		static constexpr data_t index_mask = max_index;
 
-		static constexpr data_t validation_id_increment = data_t(1) << validation_bits;
-		static constexpr data_t max_validation_id = (validation_id_increment - data_t(1)) << validation_bits;
+		static constexpr data_t validation_id_increment = data_t(1) << index_bits;
+		static constexpr data_t max_validation_id = ((data_t(1) << validation_bits) - data_t(1)) << index_bits;
 		static constexpr data_t validation_id_mask = max_validation_id;
 
 		static constexpr data_t invalid_handle = data_t(-1);

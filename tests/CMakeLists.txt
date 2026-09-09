@@ -2,6 +2,7 @@ add_executable(tests
     tests.cpp
     TBitMask.h
     TECS.h
+    THandle.h
     THandleFreeList.h
     TSparseSet.h
     TSparseTagSet.h

@@ -2,6 +2,7 @@
 
 #include "TBitMask.h"
 #include "TECS.h"
+#include "THandle.h"
 #include "THandleFreeList.h"
 #include "TSparseSet.h"
 #include "TSparseTagSet.h"

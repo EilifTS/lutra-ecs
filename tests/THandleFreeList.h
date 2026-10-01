@@ -189,6 +189,49 @@ TEST(HandleFreeList, OccupiedIteratorReverse)
 	ASSERT_TRUE(occs2[0] == i3);
 }
 
+TEST(HandleFreeList, ReusedHandleIsOccupied)
+{
+	lcs::HandleFreeList<TestHandle> list{};
+	const TestHandle before = list.GetNextHandle();
+	list.FreeHandle(before);
+
+	const TestHandle after = list.GetNextHandle();
+
+	ASSERT_TRUE(list.IsOccupied(after.GetIndex()));
+}
+
+TEST(HandleFreeList, ReusedHandleCanBeFreed)
+{
+	lcs::HandleFreeList<TestHandle> list{};
+	const TestHandle before = list.GetNextHandle();
+	list.FreeHandle(before);
+	const TestHandle after = list.GetNextHandle();
+
+	list.FreeHandle(after);
+
+	ASSERT_TRUE(!list.IsOccupied(after.GetIndex()));
+	ASSERT_TRUE(list.UsedIndexCount() == 0);
+}
+
+TEST(HandleFreeList, OccupiedIteratorIncludesReusedHandles)
+{
+	lcs::HandleFreeList<TestHandle> list{};
+	const TestHandle i1 = list.GetNextHandle();
+	const TestHandle i2_before = list.GetNextHandle();
+	list.FreeHandle(i2_before);
+	const TestHandle i2_after = list.GetNextHandle();
+
+	std::vector<TestHandle> occupied{};
+	for (const auto& i : list)
+	{
+		occupied.push_back(i);
+	}
+
+	ASSERT_TRUE(occupied.size() == 2);
+	ASSERT_TRUE(occupied[0] == i1);
+	ASSERT_TRUE(occupied[1] == i2_after);
+}
+
 TEST(HandleFreeList, Empty)
 {
 	lcs::HandleFreeList<TestHandle> list{};

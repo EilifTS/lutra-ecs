@@ -28,7 +28,7 @@ namespace lcs
 
 			const data_t old_handle_validation_id = handles[handle_index].GetValidationID();
 			next_free_index = handles[handle_index].GetIndex();
-			handles[handle_index] = handle_t::CreateNext(old_handle_validation_id, handle_index);
+			handles[handle_index] = handle_t::CreateNext(old_handle_validation_id, is_occupied_index);
 			return handle_t::CreateNext(old_handle_validation_id, handle_index);
 
 		}

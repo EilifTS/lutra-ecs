@@ -176,20 +176,6 @@ TEST(SaveMembers, ABytesCheckIsOptionalAndTheDefaultIsYes)
 	ASSERT_TRUE(!lcs::save::SaveBytesAreValid<TSave::Enemy>(TSchema::BytesOf(TSave::Enemy{ -1 })));
 }
 
-TEST(SaveMembers, EntityIdsAreOptionalAndTheDefaultIsNone)
-{
-	TSave::Position position{ 1, 2 };
-	TSave::Follower follower{ TSave::EntityID::CreateNew(3) };
-	int visited = 0;
-
-	lcs::save::ForEachEntityRef(position, [&](TSave::EntityID&) { visited++; });
-	ASSERT_TRUE(visited == 0);
-
-	lcs::save::ForEachEntityRef(follower, [&](TSave::EntityID& ref) { visited++; ref = TSave::EntityID{}; });
-	ASSERT_TRUE(visited == 1);
-	ASSERT_TRUE(!follower.target.IsValid());
-}
-
 TEST(SaveMembers, ATransientTypeNeedsNoName)
 {
 	static_assert(!TSave::Intent::saved && !TSave::Pending::saved);

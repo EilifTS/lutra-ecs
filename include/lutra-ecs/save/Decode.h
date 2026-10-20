@@ -55,16 +55,14 @@ namespace lcs::save
 	 *
 	 *     template <typename T> Verdict Component(EntityID entity, T& component);
 	 *
-	 * called with each plain component after it has been read and found valid, and
-	 * before its entity ids are checked. It may change the component (a handle into
-	 * a library, replaced with the library's own) and says Keep, Drop(why) -- the
-	 * component is left out and reported -- or Fail(why): the file cannot be used,
-	 * and the whole decode is an error. It is not called for tags.
+	 * called with each plain component after it has been read and found valid. It
+	 * may change the component (a handle into a library, replaced with the
+	 * library's own) and says Keep, Drop(why) -- the component is left out and
+	 * reported -- or Fail(why): the file cannot be used, and the whole decode is an
+	 * error. It is not called for tags.
 	 *
-	 * Entity ids are the library's: a component that holds an id the save does not
-	 * list (and that is not the invalid id, which names nothing) is dropped and
-	 * reported, after the policy has seen it. A component that can live without
-	 * such an id should not be saved with one: see ClearDeadRefs. */
+	 * Entity ids a component holds are values like any other and are not looked at
+	 * (see the note on Container). */
 	struct KeepEverything
 	{
 		template <typename EntityID, typename T>
@@ -148,22 +146,6 @@ namespace lcs::save
 				if (verdict.kind == Verdict::Kind::Drop)
 				{
 					drop<T>(entity, verdict.why);
-					return;
-				}
-
-				bool dangling_drop = false;
-				ForEachEntityRef(component, [&](const EntityID ref) {
-					/* An id that was never set names nothing and stays that way. */
-					if (!ref.IsValid() || listed.contains(ref.handle))
-					{
-						return;
-					}
-
-					dangling_drop = true;
-				});
-				if (dangling_drop)
-				{
-					drop<T>(entity, "the entity it refers to is not in the save");
 					return;
 				}
 

@@ -36,14 +36,23 @@
  *    trailer      CRC-32 of every byte before it
  *
  *  A chunk is named for its component (Schema: save_name), which is its identity in
- *  the file: no number to assign and keep. A name table maps a number a component holds (a handle into some library) to
- *  the name that number stood for, so a save survives the library being numbered
- *  differently. A section is a block of the game's own bytes, found by id; a
- *  section a build does not look for is carried along and ignored. A chunk of a
- *  component this build does not know (a name it has no component for) is skipped by
- *  its length and reported by name. A chunk of one it
- *  does know, with another size, is an error: the layout changed and the bytes
- *  cannot be reinterpreted.
+ *  the file: no number to assign and keep. A name table maps a number a component
+ *  holds (a handle into some library) to the name that number stood for, so a save
+ *  survives the library being numbered differently. A section is a block of the
+ *  game's own bytes, found by id; a section a build does not look for is carried
+ *  along and ignored. A chunk of a component this build does not know (a name it
+ *  has no component for) is skipped by its length and reported by name. A chunk of
+ *  one it does know, with another size, is an error: the layout changed and the
+ *  bytes cannot be reinterpreted.
+ *
+ *  Entity ids a component holds are not looked at. They are written whole,
+ *  validation bits included, and the entities are restored under exactly their
+ *  ids (ECSManager::CreateEntitiesFromIDs), so an id means in the loaded world what
+ *  it meant in the saved one: a live entity's id names it again, and the id of an
+ *  entity that was already destroyed (an arrow's owner, after the archer died)
+ *  still names nothing alive. The one difference is a destroyed entity's slot, whose
+ *  validation counter starts over (HandleFreeList::Restore), so a stale id can come
+ *  to match a new entity a few reuses of that slot sooner than it would have.
  */
 namespace lcs::save
 {

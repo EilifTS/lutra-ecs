@@ -35,11 +35,7 @@
  *      struct Follower
  *      {
  *          ...
- *          EntityID target;
- *
- *          // Optional: the entity ids it holds, which are checked against the
- *          // file's entities.
- *          template <typename V> void ForEachEntityRef(V&& visit) { visit(target); }
+ *          EntityID target;  // an entity id is a value like any other: see Container.h
  *      };
  *
  *      struct Intent
@@ -68,9 +64,6 @@ namespace lcs::save
 
 		template <typename T>
 		concept ChecksItsBytes = requires (std::span<const std::byte> raw) { { T::SaveBytesValid(raw) } -> std::convertible_to<bool>; };
-
-		template <typename T>
-		concept HoldsEntityIds = requires (T& component) { component.ForEachEntityRef([](auto&) {}); };
 	}
 
 	/* The name a saved type is written under: the identity of the component in a file,
@@ -94,17 +87,6 @@ namespace lcs::save
 		else
 		{
 			return true;
-		}
-	}
-
-	/* Calls visit(EntityID&) for each entity id the component holds: what its
-	 * ForEachEntityRef does, or nothing if it has none. */
-	template <typename T, typename Visitor>
-	void ForEachEntityRef(T& component, Visitor&& visit)
-	{
-		if constexpr (detail::HoldsEntityIds<T>)
-		{
-			component.ForEachEntityRef(visit);
 		}
 	}
 

@@ -44,7 +44,7 @@ namespace TSave
 		}
 	};
 
-	/* Can live without its target, if whoever saves it clears a dead one (ClearDeadRefs). */
+	/* Holds an entity id, which is a value like any other. */
 	struct Follower
 	{
 		static constexpr lcs::ComponentType component_type = lcs::ComponentType::Component;
@@ -53,10 +53,9 @@ namespace TSave
 
 		EntityID target;
 
-		template <typename V> void ForEachEntityRef(V&& visit) { visit(target); }
 	};
 
-	/* Means nothing without its anchor, so nothing clears a dead one: it is dropped on load. */
+	/* Holds an entity id next to other state. */
 	struct Leash
 	{
 		static constexpr lcs::ComponentType component_type = lcs::ComponentType::Component;
@@ -66,7 +65,6 @@ namespace TSave
 		EntityID anchor;
 		int length;
 
-		template <typename V> void ForEachEntityRef(V&& visit) { visit(anchor); }
 	};
 
 	struct Wet

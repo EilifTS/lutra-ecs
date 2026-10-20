@@ -46,34 +46,6 @@ namespace lcs::save
 		Verdict Accept(EntityID, T&) { return Verdict::Keep(); }
 	};
 
-	/* For a policy's Accept, on a component that can live without an entity it refers
-	 * to: clears every entity id in `copy` that names an entity which no longer exists
-	 * (destroyed, or its index reused), and returns how many. Decode drops a component
-	 * whose entity ids the save does not list, and an id that outlived its entity is
-	 * one -- an arrow whose archer died -- so a component that would rather lose the
-	 * reference than itself says so here, where it is saved.
-	 *
-	 *     template <typename T> Verdict Accept(EntityID entity, T& copy)
-	 *     {
-	 *         if constexpr (std::is_same_v<T, Arrow>) lcs::save::ClearDeadRefs<MySchema>(ecs, copy);
-	 *         return Verdict::Keep();
-	 *     } */
-	template <typename Schema, typename T>
-	size_t ClearDeadRefs(const typename Schema::EcsType& ecs, T& copy)
-	{
-		using EntityID = typename Schema::EcsType::EntityID;
-
-		size_t cleared = 0;
-		ForEachEntityRef(copy, [&](EntityID& ref) {
-			if (ref.IsValid() && !ecs.IsAlive(ref))
-			{
-				ref = EntityID{};
-				cleared++;
-			}
-		});
-		return cleared;
-	}
-
 	template <typename Schema, typename Policy>
 	[[nodiscard]] CaptureResult<typename Schema::EcsType> Capture(typename Schema::EcsType& ecs, Policy& policy, const Reporter& reporter)
 	{

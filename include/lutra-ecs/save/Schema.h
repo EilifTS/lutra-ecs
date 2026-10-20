@@ -1,5 +1,6 @@
 #pragma once
 #include <array>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <span>
@@ -12,44 +13,107 @@
  *  What gets saved, and what each saved component says about itself.
  *
  *  A component is written as its bytes, so a saved type must be trivially
- *  copyable. Whatever the bytes do not say lives in a traits type per component,
- *  next to the id it is saved under: which of its fields are entity ids (checked
- *  against the file's entities), and whether the bytes mean something that can
- *  be used (a number that is not a number, an enum past its last value, a flag
- *  that is not 0 or 1 would otherwise reach a system and index out of bounds).
+ *  copyable. Whatever the bytes do not say, the component says itself, with
+ *  members beside its component_type:
  *
- *  Adding a component to the ECS means choosing: saved, with an id that is never
- *  reused, or transient -- one that cannot exist when a save runs. A Schema that
- *  finds a component with no choice made, or two, breaks the build.
- *
- *  The traits are the user's own template, specialised per saved type:
- *
- *      template <typename T> struct SaveTraits;
- *      template <> struct SaveTraits<Position> : lcs::save::NoRules
+ *      struct Position
  *      {
- *          static constexpr uint32_t id = 1;
- *          static constexpr const char* name = "Position";
- *          static bool Valid(std::span<const std::byte> raw) { ... }
+ *          static constexpr lcs::ComponentType component_type = lcs::ComponentType::Component;
+ *          static constexpr bool saved = true;
+ *          static constexpr uint32_t save_id = 1;              // never changed or reused
+ *          static constexpr const char* save_name = "Position"; // for messages
+ *
+ *          float x, y;
+ *
+ *          // Optional: are these bytes a value a system can use? A number that is not a
+ *          // number, an enum past its last value, a flag that is not 0 or 1 would
+ *          // otherwise reach a system and index out of bounds. `raw` is exactly
+ *          // sizeof(Position) bytes, and is looked at before it is made into a Position.
+ *          static bool SaveBytesValid(std::span<const std::byte> raw) { ... }
  *      };
  *
- *      using MySchema = lcs::save::Schema<Ecs, SaveTraits, lcs::TypeList<Position, ...>, lcs::TypeList<Intent, ...>>;
+ *      struct Follower
+ *      {
+ *          ...
+ *          EntityID target;
  *
- *  It may carry more than the library reads (the game's own policy hooks, say);
- *  what the library reads is `id` (anything that converts to uint32_t, an enum
- *  class's value included, via static_cast), `name`, `ForEachEntityRef`
- *  and `Valid`. NoRules supplies the last two.
+ *          // Optional: the entity ids it holds, which are checked against the
+ *          // file's entities.
+ *          template <typename V> void ForEachEntityRef(V&& visit) { visit(target); }
+ *      };
+ *
+ *      struct Intent
+ *      {
+ *          static constexpr lcs::ComponentType component_type = lcs::ComponentType::Component;
+ *          static constexpr bool saved = false;  // transient: cannot exist when a save runs
+ *      };
+ *
+ *      using MySchema = lcs::save::Schema<Ecs>;
+ *
+ *  Every component and tag of the ECS says whether it is saved. One that does not
+ *  breaks the build, so none goes missing from every save unnoticed; one that is
+ *  saved without a save_id or a save_name does too. The saved types are visited in
+ *  the order the ECS lists its types. A game's own hooks (the policies of Capture
+ *  and Decode) can look for members of their own in the same way.
  */
 namespace lcs::save
 {
-	/* The base for a traits type: no entity ids, and any bytes will do. */
-	struct NoRules
+	namespace detail
 	{
-		/* Calls visit(EntityID&) for each entity id the component holds. */
-		template <typename C, typename V> static void ForEachEntityRef(C&, V&&) {}
+		template <typename T>
+		concept SaysWhetherItIsSaved = requires { { T::saved } -> std::convertible_to<bool>; };
 
-		/* `raw` is exactly sizeof(component) bytes. */
-		static bool Valid(const std::span<const std::byte>) { return true; }
-	};
+		template <typename T>
+		concept HasSaveIdAndName = requires {
+			{ static_cast<uint32_t>(T::save_id) };
+			{ T::save_name } -> std::convertible_to<const char*>;
+		};
+
+		template <typename T>
+		concept ChecksItsBytes = requires (std::span<const std::byte> raw) { { T::SaveBytesValid(raw) } -> std::convertible_to<bool>; };
+
+		template <typename T>
+		concept HoldsEntityIds = requires (T& component) { component.ForEachEntityRef([](auto&) {}); };
+	}
+
+	/* The id a saved type is written under. */
+	template <typename T>
+	constexpr uint32_t SaveIdOf()
+	{
+		return static_cast<uint32_t>(T::save_id);
+	}
+
+	template <typename T>
+	constexpr const char* SaveNameOf()
+	{
+		return T::save_name;
+	}
+
+	/* Whether the bytes of one component of type T are safe to use: what its
+	 * SaveBytesValid says, or yes if it has none. */
+	template <typename T>
+	bool SaveBytesAreValid(const std::span<const std::byte> raw)
+	{
+		if constexpr (detail::ChecksItsBytes<T>)
+		{
+			return T::SaveBytesValid(raw);
+		}
+		else
+		{
+			return true;
+		}
+	}
+
+	/* Calls visit(EntityID&) for each entity id the component holds: what its
+	 * ForEachEntityRef does, or nothing if it has none. */
+	template <typename T, typename Visitor>
+	void ForEachEntityRef(T& component, Visitor&& visit)
+	{
+		if constexpr (detail::HoldsEntityIds<T>)
+		{
+			component.ForEachEntityRef(visit);
+		}
+	}
 
 	/* One saved type, as data: for reading a file that names a component by id. */
 	struct SchemaEntry
@@ -74,65 +138,72 @@ namespace lcs::save
 
 	namespace detail
 	{
-		template <template <typename> class Traits, typename T>
+		/* Instantiated once per ECS type, so the compiler names the one that has not said. */
+		template <typename T>
+		struct Decision
+		{
+			static_assert(SaysWhetherItIsSaved<T>,
+				"a component of the ECS does not say whether it is saved: give it `static constexpr bool saved = false;` if it is transient, or `= true` with a save_id that is never reused and a save_name");
+
+			static constexpr bool saved = [] {
+				if constexpr (SaysWhetherItIsSaved<T>) return bool(T::saved);
+				else return false;
+			}();
+		};
+
+		template <typename T>
 		constexpr SchemaEntry MakeEntry()
 		{
 			/* Raw bytes only work for a type that can be copied as bytes. */
 			static_assert(std::is_trivially_copyable_v<T>, "a saved component is written as its bytes");
+			static_assert(HasSaveIdAndName<T>, "a saved component needs `static constexpr uint32_t save_id` (never reused) and `static constexpr const char* save_name`");
 
 			constexpr bool is_tag = T::component_type == ComponentType::Tag;
-			return SchemaEntry{ static_cast<uint32_t>(Traits<T>::id), Traits<T>::name, is_tag ? 0u : uint32_t(sizeof(T)), is_tag };
+			return SchemaEntry{ SaveIdOf<T>(), SaveNameOf<T>(), is_tag ? 0u : uint32_t(sizeof(T)), is_tag };
 		}
 
-		/* Instantiated once per ECS type, so the compiler names the one that was not
-		 * chosen for. */
-		template <typename T, typename Saved, typename Transient>
-		struct ChosenFor
+		template <typename... Ts>
+		constexpr auto MakeEntries(TypeList<Ts...>)
 		{
-			static_assert(IsOneOf<T>(Saved{}) || IsOneOf<T>(Transient{}),
-				"a component of the ECS is neither saved nor transient: add it to the Schema's saved types (with a traits type and an id that is never reused) or to its transient types");
-			static_assert(!(IsOneOf<T>(Saved{}) && IsOneOf<T>(Transient{})),
-				"a component is both saved and transient in the Schema");
+			return std::array<SchemaEntry, sizeof...(Ts)>{ MakeEntry<Ts>()... };
+		}
 
-			static constexpr bool value = true;
-		};
-
-		template <typename Saved, typename Transient, typename... Ts>
-		constexpr bool EveryTypeIsChosenFor(TypeList<Ts...>)
+		/* The ECS's types that are saved, in the ECS's order. */
+		template <typename... Ts>
+		constexpr auto SavedOf(TypeList<Ts...>)
 		{
-			return (ChosenFor<Ts, Saved, Transient>::value && ...);
+			return (TypeList<>{} + ... + std::conditional_t<Decision<Ts>::saved, TypeList<Ts>, TypeList<>>{});
+		}
+
+		template <typename... Ts>
+		constexpr auto TransientOf(TypeList<Ts...>)
+		{
+			return (TypeList<>{} + ... + std::conditional_t<Decision<Ts>::saved, TypeList<>, TypeList<Ts>>{});
+		}
+
+		template <typename Ecs, typename... Ts>
+		bool NothingPresent(Ecs& ecs, TypeList<Ts...>)
+		{
+			return (ecs.template IsEmpty<Ts>() && ...);
 		}
 	}
 
-	template <typename Ecs, template <typename> class Traits, typename Saved, typename Transient>
-	struct Schema;
-
-	template <typename Ecs, template <typename> class Traits, typename... Saved, typename... Transient>
-	struct Schema<Ecs, Traits, TypeList<Saved...>, TypeList<Transient...>>
+	template <typename Ecs>
+	struct Schema
 	{
 		using EcsType = Ecs;
-		using SavedTypes = TypeList<Saved...>;
-		using TransientTypes = TypeList<Transient...>;
+		using SavedTypes = decltype(detail::SavedOf(typename Ecs::Types{}));
+		using TransientTypes = decltype(detail::TransientOf(typename Ecs::Types{}));
 
-		static constexpr std::array<SchemaEntry, sizeof...(Saved)> entries{ detail::MakeEntry<Traits, Saved>()... };
+		static constexpr auto entries = detail::MakeEntries(SavedTypes{});
 
 		static_assert(IdsAreUnique(entries), "two saved components share an id");
-
-		/* A component added to the ECS without a decision about saving breaks the
-		 * build, here, instead of silently going missing from every save. */
-		static_assert(detail::EveryTypeIsChosenFor<SavedTypes, TransientTypes>(typename Ecs::Types{}));
-		static_assert(EveryTypeIsIn(SavedTypes{}, typename Ecs::Types{}), "the Schema's saved types name a type that is not in the ECS");
-		static_assert(EveryTypeIsIn(TransientTypes{}, typename Ecs::Types{}), "the Schema's transient types name a type that is not in the ECS");
-
-		/* The traits of one saved type, as the Schema was given them. */
-		template <typename T>
-		using TraitsOf = Traits<T>;
 
 		template <typename T>
 		static constexpr SchemaEntry EntryOf()
 		{
 			static_assert(IsOneOf<T>(SavedTypes{}), "this type is not one of the Schema's saved types");
-			return detail::MakeEntry<Traits, T>();
+			return detail::MakeEntry<T>();
 		}
 
 		/* Null for an id this build does not know. */
@@ -159,15 +230,15 @@ namespace lcs::save
 			bool valid = true;
 			ForEachSaved([&](auto type) {
 				using T = typename decltype(type)::type;
-				if (static_cast<uint32_t>(Traits<T>::id) == id)
+				if (SaveIdOf<T>() == id)
 				{
-					valid = Traits<T>::Valid(raw);
+					valid = SaveBytesAreValid<T>(raw);
 				}
 			});
 			return valid;
 		}
 
-		/* Calls visit(std::type_identity<T>{}) for each saved type, in list order. */
+		/* Calls visit(std::type_identity<T>{}) for each saved type, in the ECS's order. */
 		template <typename Visitor>
 		static void ForEachSaved(Visitor&& visit)
 		{
@@ -178,7 +249,7 @@ namespace lcs::save
 		 * it have consumed or cleared them. A save asserts this in a debug build. */
 		static bool NothingTransientIsPresent(Ecs& ecs)
 		{
-			return (ecs.template IsEmpty<Transient>() && ...);
+			return detail::NothingPresent(ecs, TransientTypes{});
 		}
 	};
 }

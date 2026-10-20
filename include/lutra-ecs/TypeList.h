@@ -13,6 +13,13 @@ namespace lcs
 		return (std::is_same_v<T, Ts> || ...);
 	}
 
+	/* Lists joined, in order. */
+	template <typename... As, typename... Bs>
+	constexpr TypeList<As..., Bs...> operator+(TypeList<As...>, TypeList<Bs...>)
+	{
+		return {};
+	}
+
 	/* Every type of the first list is in the second. */
 	template <typename... Ts, typename... Packed>
 	constexpr bool EveryTypeIsIn(TypeList<Ts...>, TypeList<Packed...> pack)

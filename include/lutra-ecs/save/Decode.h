@@ -96,7 +96,7 @@ namespace lcs::save
 			{
 				if (failure) return;
 
-				const ComponentChunk<EntityID>* chunk = FindChunk(data, static_cast<uint32_t>(Schema::template TraitsOf<T>::id));
+				const ComponentChunk<EntityID>* chunk = FindChunk(data, SaveIdOf<T>());
 				if (chunk == nullptr) return;
 
 				for (size_t i = 0; i < chunk->Count() && !failure; i++)
@@ -118,22 +118,20 @@ namespace lcs::save
 			template <typename T>
 			void fail(const EntityID entity, const std::string& why)
 			{
-				failure = MakeError(ErrorKind::Malformed, std::string(Schema::template TraitsOf<T>::name) + " of entity " + std::to_string(entity.GetIndex()) + ": " + why);
+				failure = MakeError(ErrorKind::Malformed, std::string(SaveNameOf<T>()) + " of entity " + std::to_string(entity.GetIndex()) + ": " + why);
 			}
 
 			template <typename T>
 			void drop(const EntityID entity, const std::string& why)
 			{
-				Report(reporter, Severity::Error, Schema::template TraitsOf<T>::name, "entity " + std::to_string(entity.GetIndex()) + " loaded without it: " + why);
+				Report(reporter, Severity::Error, SaveNameOf<T>(), "entity " + std::to_string(entity.GetIndex()) + " loaded without it: " + why);
 				out.dropped_components++;
 			}
 
 			template <typename T>
 			void decodeComponent(const ComponentChunk<EntityID>& chunk, const size_t index, const EntityID entity)
 			{
-				using Traits = typename Schema::template TraitsOf<T>;
-
-				if (!Traits::Valid(chunk.Component(index)))
+				if (!SaveBytesAreValid<T>(chunk.Component(index)))
 				{
 					fail<T>(entity, "its values cannot be used (a number that is not a number, a value out of range, or a name it needs and does not have)");
 					return;
@@ -154,7 +152,7 @@ namespace lcs::save
 				}
 
 				bool dangling_drop = false;
-				Traits::ForEachEntityRef(component, [&](const EntityID ref) {
+				ForEachEntityRef(component, [&](const EntityID ref) {
 					/* An id that was never set names nothing and stays that way. */
 					if (!ref.IsValid() || listed.contains(ref.handle))
 					{
@@ -183,7 +181,7 @@ namespace lcs::save
 	}
 
 	/* A component of an entity the save does not list is an error, as is anything
-	 * the traits or the policy fail. A chunk of a component this build does not know
+	 * the component or the policy fail. A chunk of a component this build does not know
 	 * (see Container::skipped_component_ids) is reported and skipped. */
 	template <typename Schema, typename Policy>
 	[[nodiscard]] Result<Decoded<Schema>> Decode(const Container<typename Schema::EcsType::EntityID>& data, Policy& policy, const Reporter& reporter)

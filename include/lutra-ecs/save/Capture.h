@@ -17,7 +17,7 @@
  *  Capture reads; it changes nothing.
  *
  *  A component is left out, and reported, when loading it back would fail:
- *  bytes the traits call invalid (a number that is not a number), or a policy
+ *  bytes the component calls invalid (a number that is not a number), or a policy
  *  that vetoes it. The game's own parts of a save -- name tables, sections --
  *  are the caller's to put in the Container afterwards.
  */
@@ -64,7 +64,7 @@ namespace lcs::save
 		using EntityID = typename Schema::EcsType::EntityID;
 
 		size_t cleared = 0;
-		Schema::template TraitsOf<T>::ForEachEntityRef(copy, [&](EntityID& ref) {
+		ForEachEntityRef(copy, [&](EntityID& ref) {
 			if (ref.IsValid() && !ecs.IsAlive(ref))
 			{
 				ref = EntityID{};
@@ -97,7 +97,7 @@ namespace lcs::save
 
 		Schema::ForEachSaved([&](auto type) {
 			using T = typename decltype(type)::type;
-			constexpr const char* name = Schema::template TraitsOf<T>::name;
+			constexpr const char* name = SaveNameOf<T>();
 
 			if constexpr (T::component_type == ComponentType::Tag)
 			{
@@ -112,7 +112,7 @@ namespace lcs::save
 				{
 					T copy = component;
 
-					if (!Schema::template TraitsOf<T>::Valid(std::as_bytes(std::span(&copy, 1))))
+					if (!SaveBytesAreValid<T>(std::as_bytes(std::span(&copy, 1))))
 					{
 						drop(name, entity, "its values are not ones a save can load back (a number that is not a number, or a value out of range)");
 						continue;

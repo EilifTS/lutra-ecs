@@ -303,7 +303,7 @@ TEST(Decode, AComponentOfAnEntityTheSaveDoesNotListIsAnError)
 	ASSERT_TRUE(decoded.error().message.find("entity 5") != std::string::npos);
 }
 
-TEST(Decode, ValuesTheTraitsRejectAreAnError)
+TEST(Decode, ValuesTheComponentRejectsAreAnError)
 {
 	TRoundTrip::Data data = TRoundTrip::AContainer({ TSave::EntityID::CreateNew(3) });
 	lcs::save::AddComponent<TSave::MySchema>(data, data.entities[0], TSave::Enemy{ -1 });
@@ -547,7 +547,7 @@ TEST(Restore, VisitsInTheSchemasOrder)
 	std::vector<std::string> order;
 
 	lcs::save::Restore(target, decoded, [&](const TSave::EntityID, const auto& component) {
-		order.push_back(TSave::Traits<std::remove_cvref_t<decltype(component)>>::name);
+		order.push_back(std::remove_cvref_t<decltype(component)>::save_name);
 	});
 
 	ASSERT_TRUE((order == std::vector<std::string>{ "Position", "Position", "Enemy", "Follower", "Leash", "Wet" }));

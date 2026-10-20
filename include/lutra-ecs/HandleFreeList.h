@@ -1,6 +1,7 @@
 #pragma once
 #include <lutra-ecs/Handle.h>
 
+#include <span>
 #include <vector>
 #include <assert.h>
 
@@ -46,6 +47,53 @@ namespace lcs
 			handles.clear();
 			next_free_index = 0;
 			used_index_count = 0;
+		}
+
+		/* Makes `ids` exactly the occupied handles, validation ids included, so a
+		 * handle that was saved compares equal to the one restored. For loading
+		 * only: the list must be empty (new, or Clear()ed), and `ids` must be
+		 * valid and strictly ascending by index.
+		 *
+		 * Every index below the last one that is not in `ids` becomes a free slot,
+		 * chained in ascending order, so GetNextHandle fills the gaps before it
+		 * grows. A gap starts over at validation id 0: nothing refers to what used
+		 * to be there.
+		 *
+		 * This takes the whole set at once because a free slot's link to "the next
+		 * fresh index" is the list's own size. Adding slots one by one would move
+		 * that index under the chain. */
+		inline void Restore(std::span<const handle_t> ids)
+		{
+			assert(handles.empty() && "Restore needs an empty list");
+			for (size_t n = 0; n < ids.size(); n++)
+			{
+				assert(ids[n].IsValid());
+				assert(ids[n].GetIndex() < is_occupied_index);
+				assert(n == 0 || ids[n - 1].GetIndex() < ids[n].GetIndex());
+			}
+
+			const data_t size = ids.empty() ? data_t(0) : ids.back().GetIndex() + 1;
+			handles.resize(size);
+
+			/* From the back, so each free slot can link to the next free one. */
+			data_t next_free = size;
+			auto id = ids.rbegin();
+			for (data_t index = size; index-- > 0; )
+			{
+				if (id != ids.rend() && id->GetIndex() == index)
+				{
+					handles[index] = handle_t::Create(id->GetValidationID(), is_occupied_index);
+					++id;
+				}
+				else
+				{
+					handles[index] = handle_t::Create(0, next_free);
+					next_free = index;
+				}
+			}
+
+			next_free_index = next_free;
+			used_index_count = data_t(ids.size());
 		}
 
 		inline bool IsOccupied(data_t handle_index) const
@@ -116,19 +164,19 @@ namespace lcs
 
 		using RIterator = std::reverse_iterator<Iterator>;
 
-		Iterator begin()
+		Iterator begin() const
 		{
 			return Iterator(*this, std::begin(handles));
 		}
-		Iterator end()
+		Iterator end() const
 		{
 			return Iterator(*this, std::end(handles));
 		}
-		RIterator rbegin()
+		RIterator rbegin() const
 		{
 			return RIterator(Iterator(*this, std::end(handles)));
 		}
-		RIterator rend()
+		RIterator rend() const
 		{
 			return RIterator(Iterator(*this, std::begin(handles)));
 		}

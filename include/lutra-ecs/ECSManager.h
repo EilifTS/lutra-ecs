@@ -22,6 +22,14 @@ namespace lcs
 		ECSManager() { reserveComponentStorage(reserved_component_count); };
 
 		inline EntityID CreateEntity();
+
+		/* Creates entities with exactly these ids, validation bits included. For
+		 * restoring a saved world only: nothing may have been created since the
+		 * ECS was constructed or Clear()ed, and `ids` must be valid and strictly
+		 * ascending by index. Indices below the last one that are not in `ids`
+		 * are free, and CreateEntity fills them (lowest first) before it grows. */
+		inline void CreateEntitiesFromIDs(std::span<const EntityID> ids);
+
 		inline void DestroyEntity(EntityID entity);
 		inline const HandleFreeList<EntityID>& Entities() { return entity_id_generator; };
 		//inline const IndexFreeList::OccupiedIndicesContainer<true> EntitiesReverse() { return entity_id_generator.OccupiedIndicesReverse(); };
@@ -66,6 +74,24 @@ namespace lcs
 	}
 
 	template <typename EntityID, typename... Ts>
+	inline void ECSManager<EntityID, Ts...>::CreateEntitiesFromIDs(std::span<const EntityID> ids)
+	{
+		assert(entity_id_generator.MaxIndex() == 0 && "CreateEntitiesFromIDs needs an ECS with no entities ever created since Clear()");
+
+		entity_id_generator.Restore(ids);
+
+		/* The sparse arrays must reach every index in use. CreateEntity grows them
+		 * when they are exactly full, so only the size has to be at least the
+		 * list's. Sizes only ever grow (ReserveSparseSize asserts on a no-op). */
+		const EntityID::data_t needed = entity_id_generator.MaxIndex();
+		if (needed > reserved_component_count)
+		{
+			reserved_component_count = needed;
+			reserveComponentStorage(reserved_component_count);
+		}
+	}
+
+	template <typename EntityID, typename... Ts>
 	inline void ECSManager<EntityID, Ts...>::DestroyEntity(EntityID id)
 	{
 		/* Remove components */
@@ -77,7 +103,7 @@ namespace lcs
 	template <typename EntityID, typename... Ts>
 	inline EntityID::data_t ECSManager<EntityID, Ts...>::GetEntityCount()
 	{
-		return entity_id_generator.UsedHandleCount();
+		return entity_id_generator.UsedIndexCount();
 	}
 
 	template <typename EntityID, typename... Ts> template <typename T>

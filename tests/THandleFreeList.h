@@ -238,3 +238,159 @@ TEST(HandleFreeList, Empty)
 	ASSERT_TRUE(list.MaxIndex() == 0);
 	for (auto i : list) {}
 }
+
+/* A handle that has been through a free and a reuse, so its validation id is not 0. */
+inline TestHandle ReusedHandle(lcs::HandleFreeList<TestHandle>& list)
+{
+	const TestHandle first = list.GetNextHandle();
+	list.FreeHandle(first);
+	return list.GetNextHandle();
+}
+
+inline std::vector<TestHandle> Occupied(lcs::HandleFreeList<TestHandle>& list)
+{
+	std::vector<TestHandle> occupied{};
+	for (const auto& i : list)
+	{
+		occupied.push_back(i);
+	}
+	return occupied;
+}
+
+TEST(HandleFreeList, RestoreOccupiesExactlyTheGivenHandles)
+{
+	lcs::HandleFreeList<TestHandle> source{};
+	const TestHandle reused = ReusedHandle(source);
+	ASSERT_TRUE(reused.GetValidationID() != 0);
+
+	const std::vector<TestHandle> ids{ TestHandle::CreateNew(0), TestHandle::Create(reused.GetValidationID(), 2), TestHandle::CreateNew(5) };
+	lcs::HandleFreeList<TestHandle> list{};
+	list.Restore(ids);
+
+	ASSERT_TRUE(list.MaxIndex() == 6);
+	ASSERT_TRUE(list.UsedIndexCount() == 3);
+	ASSERT_TRUE(list.IsOccupied(0));
+	ASSERT_TRUE(!list.IsOccupied(1));
+	ASSERT_TRUE(list.IsOccupied(2));
+	ASSERT_TRUE(!list.IsOccupied(3));
+	ASSERT_TRUE(!list.IsOccupied(4));
+	ASSERT_TRUE(list.IsOccupied(5));
+	ASSERT_TRUE(Occupied(list) == ids);
+}
+
+TEST(HandleFreeList, RestoredGapsAreReusedLowestFirstThenTheListGrows)
+{
+	lcs::HandleFreeList<TestHandle> list{};
+	const std::vector<TestHandle> ids{ TestHandle::CreateNew(0), TestHandle::CreateNew(2), TestHandle::CreateNew(5) };
+	list.Restore(ids);
+
+	ASSERT_TRUE(list.GetNextHandle().GetIndex() == 1);
+	ASSERT_TRUE(list.GetNextHandle().GetIndex() == 3);
+	ASSERT_TRUE(list.GetNextHandle().GetIndex() == 4);
+	ASSERT_TRUE(list.GetNextHandle().GetIndex() == 6);
+	ASSERT_TRUE(list.UsedIndexCount() == 7);
+	ASSERT_TRUE(list.MaxIndex() == 7);
+}
+
+TEST(HandleFreeList, RestoredHandleKeepsItsValidationIdAndCanBeFreedAndReused)
+{
+	lcs::HandleFreeList<TestHandle> source{};
+	const TestHandle reused = ReusedHandle(source);
+
+	lcs::HandleFreeList<TestHandle> list{};
+	list.Restore(std::vector<TestHandle>{ reused });
+	ASSERT_TRUE(Occupied(list).size() == 1);
+	ASSERT_TRUE(Occupied(list)[0] == reused);
+
+	list.FreeHandle(reused);
+	const TestHandle after = list.GetNextHandle();
+
+	ASSERT_TRUE(after.GetIndex() == reused.GetIndex());
+	ASSERT_TRUE(after.GetValidationID() != reused.GetValidationID());
+}
+
+TEST(HandleFreeList, RestoreWithNoGapsGrowsFromTheEnd)
+{
+	lcs::HandleFreeList<TestHandle> list{};
+	list.Restore(std::vector<TestHandle>{ TestHandle::CreateNew(0), TestHandle::CreateNew(1), TestHandle::CreateNew(2) });
+
+	ASSERT_TRUE(list.MaxIndex() == 3);
+	ASSERT_TRUE(list.GetNextHandle().GetIndex() == 3);
+}
+
+TEST(HandleFreeList, RestoreStartingAboveZeroFreesTheIndicesBelow)
+{
+	lcs::HandleFreeList<TestHandle> list{};
+	list.Restore(std::vector<TestHandle>{ TestHandle::CreateNew(3) });
+
+	ASSERT_TRUE(list.UsedIndexCount() == 1);
+	ASSERT_TRUE(list.GetNextHandle().GetIndex() == 0);
+	ASSERT_TRUE(list.GetNextHandle().GetIndex() == 1);
+	ASSERT_TRUE(list.GetNextHandle().GetIndex() == 2);
+	ASSERT_TRUE(list.GetNextHandle().GetIndex() == 4);
+}
+
+TEST(HandleFreeList, RestoreOfNothingLeavesAnEmptyList)
+{
+	lcs::HandleFreeList<TestHandle> list{};
+	list.Restore({});
+
+	ASSERT_TRUE(list.MaxIndex() == 0);
+	ASSERT_TRUE(list.UsedIndexCount() == 0);
+	ASSERT_TRUE(Occupied(list).empty());
+	ASSERT_TRUE(list.GetNextHandle().GetIndex() == 0);
+}
+
+TEST(HandleFreeList, RestoreWorksAgainAfterClear)
+{
+	lcs::HandleFreeList<TestHandle> list{};
+	list.GetNextHandle();
+	list.GetNextHandle();
+	list.Clear();
+
+	const std::vector<TestHandle> ids{ TestHandle::CreateNew(1), TestHandle::CreateNew(4) };
+	list.Restore(ids);
+
+	ASSERT_TRUE(Occupied(list) == ids);
+	ASSERT_TRUE(list.GetNextHandle().GetIndex() == 0);
+}
+
+TEST(HandleFreeList, ARestoredListFreesAndReusesLikeAnyOther)
+{
+	lcs::HandleFreeList<TestHandle> list{};
+	const std::vector<TestHandle> ids{ TestHandle::CreateNew(0), TestHandle::CreateNew(2) };
+	list.Restore(ids);
+
+	list.FreeHandle(ids[1]);
+	list.FreeHandle(ids[0]);
+
+	/* The last one freed, the one freed before it, the original gap, then growth. */
+	ASSERT_TRUE(list.GetNextHandle().GetIndex() == 0);
+	ASSERT_TRUE(list.GetNextHandle().GetIndex() == 2);
+	ASSERT_TRUE(list.GetNextHandle().GetIndex() == 1);
+	ASSERT_TRUE(list.GetNextHandle().GetIndex() == 3);
+}
+
+TEST(HandleFreeList, CanBeIteratedThroughAConstReference)
+{
+	lcs::HandleFreeList<TestHandle> list{};
+	const TestHandle i1 = list.GetNextHandle();
+	const TestHandle i2 = list.GetNextHandle();
+	const TestHandle i3 = list.GetNextHandle();
+	list.FreeHandle(i2);
+
+	const lcs::HandleFreeList<TestHandle>& const_list = list;
+	std::vector<TestHandle> forward{};
+	for (const TestHandle i : const_list)
+	{
+		forward.push_back(i);
+	}
+	std::vector<TestHandle> backward{};
+	for (auto it = const_list.rbegin(); it != const_list.rend(); ++it)
+	{
+		backward.push_back(*it);
+	}
+
+	ASSERT_TRUE((forward == std::vector<TestHandle>{ i1, i3 }));
+	ASSERT_TRUE((backward == std::vector<TestHandle>{ i3, i1 }));
+}

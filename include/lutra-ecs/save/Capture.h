@@ -1,8 +1,10 @@
 #pragma once
 #include <cassert>
+#include <concepts>
 #include <cstddef>
 #include <span>
 #include <string>
+#include <type_traits>
 
 #include <lutra-ecs/save/Container.h>
 #include <lutra-ecs/save/Report.h>
@@ -32,22 +34,39 @@ namespace lcs::save
 		size_t dropped_components{ 0 };
 	};
 
-	/* A policy is any type with
-	 *
-	 *     template <typename T> Verdict Accept(EntityID entity, T& copy);
-	 *
-	 * called with a copy of each plain component that passed Valid, before it is
-	 * written. It may look at the copy (is every handle in it nameable?) and it
-	 * may remember it (which handles are used), and says Keep or Drop(why). It is
-	 * not called for tags, which are only an entity id. */
-	struct AcceptEverything
+	namespace detail
 	{
-		template <typename EntityID, typename T>
-		Verdict Accept(EntityID, T&) { return Verdict::Keep(); }
-	};
+		template <typename P, typename EntityID, typename T>
+		concept AcceptsComponent = requires (P& policy, EntityID entity, T& copy) { { policy.Accept(entity, copy) } -> std::same_as<Verdict>; };
 
-	template <typename Schema, typename Policy>
-	[[nodiscard]] CaptureResult<typename Schema::EcsType> Capture(typename Schema::EcsType& ecs, Policy& policy, const Reporter& reporter)
+		/* The policy's verdict on a component, or Keep if it has no hook for the type.
+		 * A function of its own so that looking up `Accept` waits for the policy's type. */
+		template <typename P, typename EntityID, typename T>
+		Verdict AskPolicy(P& policy, const EntityID entity, T& copy)
+		{
+			if constexpr (AcceptsComponent<P, EntityID, T>)
+			{
+				return policy.Accept(entity, copy);
+			}
+			else
+			{
+				return Verdict::Keep();
+			}
+		}
+	}
+
+	/* A capture policy may have
+	 *
+	 *     Verdict Accept(EntityID entity, T& copy);   // a template, or for chosen types only
+	 *
+	 * which is called with a copy of each plain component of a type it accepts (it is
+	 * a template, or overloaded, or constrained), after the component's own
+	 * SaveBytesValid has passed and before it is written. It may look at the copy (is
+	 * every handle in it nameable?) and it may remember it (which handles are used),
+	 * and says Keep or Drop(why). A type it has no Accept for is written as it is,
+	 * and it is not called for tags, which are only an entity id. */
+	template <typename Schema, typename Policy = NoPolicy>
+	[[nodiscard]] CaptureResult<typename Schema::EcsType> Capture(typename Schema::EcsType& ecs, const Reporter& reporter, Policy&& policy = {})
 	{
 		using Ecs = typename Schema::EcsType;
 		using EntityID = typename Ecs::EntityID;
@@ -90,7 +109,7 @@ namespace lcs::save
 						continue;
 					}
 
-					const Verdict verdict = policy.Accept(entity, copy);
+					const Verdict verdict = detail::AskPolicy(policy, entity, copy);
 					if (verdict.kind != Verdict::Kind::Keep)
 					{
 						drop(name, entity, verdict.why);
@@ -103,12 +122,5 @@ namespace lcs::save
 		});
 
 		return result;
-	}
-
-	template <typename Schema>
-	[[nodiscard]] CaptureResult<typename Schema::EcsType> Capture(typename Schema::EcsType& ecs, const Reporter& reporter)
-	{
-		AcceptEverything policy;
-		return Capture<Schema>(ecs, policy, reporter);
 	}
 }

@@ -236,7 +236,7 @@ TEST(Capture, ThePolicyCanRefuseAComponentWithAReason)
 	TRoundTrip::Log log;
 	TRoundTrip::RecordingPolicy policy{ .refuse_enemies_over = true, .refuse_strength_over = 10 };
 
-	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, policy, log.Reporter());
+	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter(), policy);
 
 	ASSERT_TRUE(captured.dropped_components == 1);
 	ASSERT_TRUE(lcs::save::FindChunk(captured.data, "Enemy") == nullptr);
@@ -250,7 +250,7 @@ TEST(Capture, ThePolicyIsAskedAboutPlainComponentsAndNotAboutTags)
 	TRoundTrip::Log log;
 	TRoundTrip::RecordingPolicy policy{};
 
-	(void)lcs::save::Capture<TSave::MySchema>(world.ecs, policy, log.Reporter());
+	(void)lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter(), policy);
 
 	ASSERT_TRUE(policy.accepted_calls == 5); /* 2 positions, enemy, follower, leash: not the one tag */
 }
@@ -323,7 +323,7 @@ TEST(Decode, ThePolicyCanChangeAComponentOnTheWayIn)
 	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter());
 	TRoundTrip::RecordingPolicy policy{ .add_to_position_x = 100 };
 
-	const auto decoded = lcs::save::Decode<TSave::MySchema>(captured.data, policy, log.Reporter());
+	const auto decoded = lcs::save::Decode<TSave::MySchema>(captured.data, log.Reporter(), policy);
 
 	ASSERT_TRUE(decoded.has_value());
 	for (const auto& [entity, position] : decoded->Of<TSave::Position>())
@@ -339,7 +339,7 @@ TEST(Decode, ThePolicyCanDropAComponentWithAReason)
 	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter());
 	TRoundTrip::RecordingPolicy policy{ .refuse_enemies_over = true, .refuse_strength_over = 10 };
 
-	const auto decoded = lcs::save::Decode<TSave::MySchema>(captured.data, policy, log.Reporter());
+	const auto decoded = lcs::save::Decode<TSave::MySchema>(captured.data, log.Reporter(), policy);
 
 	ASSERT_TRUE(decoded.has_value());
 	ASSERT_TRUE(decoded->Of<TSave::Enemy>().empty());
@@ -355,7 +355,7 @@ TEST(Decode, ThePolicyCanFailTheWholeDecode)
 	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter());
 	TRoundTrip::RecordingPolicy policy{ .fail_on_follower = true };
 
-	const auto decoded = lcs::save::Decode<TSave::MySchema>(captured.data, policy, log.Reporter());
+	const auto decoded = lcs::save::Decode<TSave::MySchema>(captured.data, log.Reporter(), policy);
 
 	ASSERT_TRUE(!decoded.has_value());
 	ASSERT_TRUE(decoded.error().kind == lcs::save::ErrorKind::Malformed);
@@ -369,7 +369,7 @@ TEST(Decode, ThePolicyIsNotAskedAboutTags)
 	TRoundTrip::Log log;
 	TRoundTrip::RecordingPolicy policy{};
 
-	const auto decoded = lcs::save::Decode<TSave::MySchema>(data, policy, log.Reporter());
+	const auto decoded = lcs::save::Decode<TSave::MySchema>(data, log.Reporter(), policy);
 
 	ASSERT_TRUE(decoded.has_value());
 	ASSERT_TRUE(policy.component_calls == 0);
@@ -646,4 +646,107 @@ TEST(EntityIds, AReferenceToAReusedIndexDoesNotNameTheNewEntityAfterTheLoad)
 	ASSERT_TRUE(target.IsAlive(replacement));
 	ASSERT_TRUE(target.GetComponent<TSave::Follower>(follower).target == old_target);
 	ASSERT_TRUE(!target.IsAlive(target.GetComponent<TSave::Follower>(follower).target));
+}
+
+/*
+ *  A policy has the hooks it needs and nothing else
+ */
+
+namespace TRoundTrip
+{
+	/* Capture hook for one component type only, not a template: every other type is let through. */
+	struct RefusesStrongEnemies
+	{
+		int asked{ 0 };
+
+		Verdict Accept(const EntityID, TSave::Enemy& copy)
+		{
+			asked++;
+			return copy.strength > 10 ? Verdict::Drop("too strong") : Verdict::Keep();
+		}
+	};
+
+	/* Decode hook for one component type only. */
+	struct MovesPositions
+	{
+		Verdict Component(const EntityID, TSave::Position& position)
+		{
+			position.x += 100;
+			return Verdict::Keep();
+		}
+	};
+
+	/* No hooks at all. */
+	struct SaysNothing {};
+}
+
+TEST(Policy, ACaptureHookForOneTypeIsAskedAboutThatTypeOnly)
+{
+	TRoundTrip::World world;
+	TRoundTrip::Log log;
+	TRoundTrip::RefusesStrongEnemies policy;
+
+	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter(), policy);
+
+	ASSERT_TRUE(policy.asked == 1);
+	ASSERT_TRUE(captured.dropped_components == 1);
+	ASSERT_TRUE(lcs::save::FindChunk(captured.data, "Enemy") == nullptr);
+	ASSERT_TRUE(lcs::save::FindChunk(captured.data, "Position") != nullptr); /* written as it is */
+	ASSERT_TRUE(lcs::save::FindChunk(captured.data, "Follower") != nullptr);
+}
+
+TEST(Policy, ADecodeHookForOneTypeChangesThatTypeOnly)
+{
+	TRoundTrip::World world;
+	TRoundTrip::Log log;
+	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter());
+
+	const auto decoded = lcs::save::Decode<TSave::MySchema>(captured.data, log.Reporter(), TRoundTrip::MovesPositions{});
+
+	ASSERT_TRUE(decoded.has_value());
+	for (const auto& [entity, position] : decoded->Of<TSave::Position>())
+	{
+		ASSERT_TRUE(position.x >= 101);
+	}
+	ASSERT_TRUE(decoded->Of<TSave::Enemy>()[0].second.strength == 30); /* no hook for it: as it is */
+}
+
+/* The hooks are separate: a policy written for one direction is not in the way of the other. */
+TEST(Policy, AHookForTheOtherDirectionIsNotCalled)
+{
+	TRoundTrip::World world;
+	TRoundTrip::Log log;
+	TRoundTrip::RefusesStrongEnemies capture_only;
+
+	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter(), TRoundTrip::MovesPositions{});
+	const auto decoded = lcs::save::Decode<TSave::MySchema>(captured.data, log.Reporter(), capture_only);
+
+	ASSERT_TRUE(captured.dropped_components == 0);
+	ASSERT_TRUE(decoded.has_value() && decoded->dropped_components == 0);
+	ASSERT_TRUE(capture_only.asked == 0);
+}
+
+TEST(Policy, ATypeWithNoHooksLetsEverythingThrough)
+{
+	TRoundTrip::World world;
+	TRoundTrip::Log log;
+
+	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter(), TRoundTrip::SaysNothing{});
+	const auto decoded = lcs::save::Decode<TSave::MySchema>(captured.data, log.Reporter(), TRoundTrip::SaysNothing{});
+
+	ASSERT_TRUE(captured.dropped_components == 0);
+	ASSERT_TRUE(decoded.has_value() && decoded->dropped_components == 0);
+	ASSERT_TRUE(decoded->Of<TSave::Enemy>().size() == 1 && decoded->Of<TSave::Position>().size() == 2);
+}
+
+TEST(Policy, NoPolicyIsTheDefaultAndCanBeSaidOutLoud)
+{
+	TRoundTrip::World world;
+	TRoundTrip::Log log;
+
+	const auto implicit = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter());
+	const auto spoken = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter(), lcs::save::NoPolicy{});
+
+	ASSERT_TRUE(implicit.data.chunks.size() == spoken.data.chunks.size());
+	ASSERT_TRUE(implicit.dropped_components == 0 && spoken.dropped_components == 0);
 }

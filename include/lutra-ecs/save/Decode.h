@@ -1,9 +1,11 @@
 #pragma once
+#include <concepts>
 #include <cstddef>
 #include <optional>
 #include <span>
 #include <string>
 #include <tuple>
+#include <type_traits>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -51,26 +53,11 @@ namespace lcs::save
 		template <typename T> const Entries<EntityID, T>& Of() const { return std::get<Entries<EntityID, T>>(components); }
 	};
 
-	/* A policy is any type with
-	 *
-	 *     template <typename T> Verdict Component(EntityID entity, T& component);
-	 *
-	 * called with each plain component after it has been read and found valid. It
-	 * may change the component (a handle into a library, replaced with the
-	 * library's own) and says Keep, Drop(why) -- the component is left out and
-	 * reported -- or Fail(why): the file cannot be used, and the whole decode is an
-	 * error. It is not called for tags.
-	 *
-	 * Entity ids a component holds are values like any other and are not looked at
-	 * (see the note on Container). */
-	struct KeepEverything
-	{
-		template <typename EntityID, typename T>
-		Verdict Component(EntityID, T&) { return Verdict::Keep(); }
-	};
-
 	namespace detail
 	{
+		template <typename P, typename EntityID, typename T>
+		concept DecidesOnComponent = requires (P& policy, EntityID entity, T& component) { { policy.Component(entity, component) } -> std::same_as<Verdict>; };
+
 		template <typename Schema, typename Policy>
 		class Decoder
 		{
@@ -137,16 +124,19 @@ namespace lcs::save
 
 				T component = ReadComponent<T>(chunk, index);
 
-				const Verdict verdict = policy.Component(entity, component);
-				if (verdict.kind == Verdict::Kind::Fail)
+				if constexpr (DecidesOnComponent<Policy, EntityID, T>)
 				{
-					fail<T>(entity, verdict.why);
-					return;
-				}
-				if (verdict.kind == Verdict::Kind::Drop)
-				{
-					drop<T>(entity, verdict.why);
-					return;
+					const Verdict verdict = policy.Component(entity, component);
+					if (verdict.kind == Verdict::Kind::Fail)
+					{
+						fail<T>(entity, verdict.why);
+						return;
+					}
+					if (verdict.kind == Verdict::Kind::Drop)
+					{
+						drop<T>(entity, verdict.why);
+						return;
+					}
 				}
 
 				out.template Of<T>().emplace_back(entity, component);
@@ -164,9 +154,24 @@ namespace lcs::save
 
 	/* A component of an entity the save does not list is an error, as is anything
 	 * the component or the policy fail. A chunk of a component this build does not know
-	 * (see Container::skipped_component_names) is reported and skipped. */
-	template <typename Schema, typename Policy>
-	[[nodiscard]] Result<Decoded<Schema>> Decode(const Container<typename Schema::EcsType::EntityID>& data, Policy& policy, const Reporter& reporter)
+	 * (see Container::skipped_component_names) is reported and skipped.
+	 *
+	 * A decode policy may have
+	 *
+	 *     Verdict Component(EntityID entity, T& component);   // a template, or for chosen types only
+	 *
+	 * which is called with each plain component of a type it accepts (it is a
+	 * template, or overloaded, or constrained), after the component has been read and
+	 * found valid. It may change the component (a handle into a library, replaced
+	 * with the library's own) and says Keep, Drop(why) -- the component is left out
+	 * and reported -- or Fail(why): the file cannot be used, and the whole decode is
+	 * an error. A type it has no Component for is decoded as it is, and it is not
+	 * called for tags.
+	 *
+	 * Entity ids a component holds are values like any other and are not looked at
+	 * (see the note on Container). */
+	template <typename Schema, typename Policy = NoPolicy>
+	[[nodiscard]] Result<Decoded<Schema>> Decode(const Container<typename Schema::EcsType::EntityID>& data, const Reporter& reporter, Policy&& policy = {})
 	{
 		using EntityID = typename Schema::EcsType::EntityID;
 
@@ -178,7 +183,7 @@ namespace lcs::save
 		Decoded<Schema> out;
 		out.entities = data.entities;
 
-		detail::Decoder<Schema, Policy> decoder(data, policy, reporter, out);
+		detail::Decoder<Schema, std::remove_reference_t<Policy>> decoder(data, policy, reporter, out);
 
 		for (const ComponentChunk<EntityID>& chunk : data.chunks)
 		{
@@ -198,13 +203,6 @@ namespace lcs::save
 		}
 
 		return out;
-	}
-
-	template <typename Schema>
-	[[nodiscard]] Result<Decoded<Schema>> Decode(const Container<typename Schema::EcsType::EntityID>& data, const Reporter& reporter)
-	{
-		KeepEverything policy;
-		return Decode<Schema>(data, policy, reporter);
 	}
 
 	/* Creates the decoded entities in the ECS, with exactly their ids, and calls

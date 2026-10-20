@@ -43,4 +43,11 @@ namespace lcs::save
 		 * there is no file to fail, so it is a Drop. */
 		static Verdict Fail(std::string why) { return Verdict{ Kind::Fail, std::move(why) }; }
 	};
+
+	/* A policy is how a game takes part in Capture and Decode: any type, with
+	 * whichever of the hooks it needs (`Accept` for Capture, `Component` for Decode;
+	 * see each). A hook it does not have is a component let through as it is, so a
+	 * policy that only cares about one of them, or about one component type, says
+	 * only that. NoPolicy has none, and is what a call without a policy gets. */
+	struct NoPolicy {};
 }

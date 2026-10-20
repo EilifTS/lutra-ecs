@@ -116,12 +116,6 @@ namespace lcs::save
 			template <typename T>
 			void decodeComponent(const ComponentChunk<EntityID>& chunk, const size_t index, const EntityID entity)
 			{
-				if (!SaveBytesAreValid<T>(chunk.Component(index)))
-				{
-					fail<T>(entity, "its values cannot be used (a number that is not a number, a value out of range, or a name it needs and does not have)");
-					return;
-				}
-
 				T component = ReadComponent<T>(chunk, index);
 
 				if constexpr (DecidesOnComponent<Policy, EntityID, T>)
@@ -161,8 +155,8 @@ namespace lcs::save
 	 *     Verdict Component(EntityID entity, T& component);   // a template, or for chosen types only
 	 *
 	 * which is called with each plain component of a type it accepts (it is a
-	 * template, or overloaded, or constrained), after the component has been read and
-	 * found valid. It may change the component (a handle into a library, replaced
+	 * template, or overloaded, or constrained), after the component has been read.
+	 * It may change the component (a handle into a library, replaced
 	 * with the library's own) and says Keep, Drop(why) -- the component is left out
 	 * and reported -- or Fail(why): the file cannot be used, and the whole decode is
 	 * an error. A type it has no Component for is decoded as it is, and it is not

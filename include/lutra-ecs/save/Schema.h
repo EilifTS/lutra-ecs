@@ -14,7 +14,8 @@
  *  What gets saved, and what each saved component says about itself.
  *
  *  A component is written as its bytes, so a saved type must be trivially
- *  copyable. Whatever the bytes do not say, the component says itself, with
+ *  copyable, and is read back as the bytes it was: a value is what the world held,
+ *  and a load does not second-guess it. What a component says about itself is
  *  members beside its component_type:
  *
  *      struct Position
@@ -24,12 +25,6 @@
  *          static constexpr const char* save_name = "Position"; // what the file calls it
  *
  *          float x, y;
- *
- *          // Optional: are these bytes a value a system can use? A number that is not a
- *          // number, an enum past its last value, a flag that is not 0 or 1 would
- *          // otherwise reach a system and index out of bounds. `raw` is exactly
- *          // sizeof(Position) bytes, and is looked at before it is made into a Position.
- *          static bool SaveBytesValid(std::span<const std::byte> raw) { ... }
  *      };
  *
  *      struct Follower
@@ -61,9 +56,6 @@ namespace lcs::save
 
 		template <typename T>
 		concept HasSaveName = requires { { T::save_name } -> std::convertible_to<const char*>; };
-
-		template <typename T>
-		concept ChecksItsBytes = requires (std::span<const std::byte> raw) { { T::SaveBytesValid(raw) } -> std::convertible_to<bool>; };
 	}
 
 	/* The name a saved type is written under: the identity of the component in a file,
@@ -73,21 +65,6 @@ namespace lcs::save
 	constexpr const char* SaveNameOf()
 	{
 		return T::save_name;
-	}
-
-	/* Whether the bytes of one component of type T are safe to use: what its
-	 * SaveBytesValid says, or yes if it has none. */
-	template <typename T>
-	bool SaveBytesAreValid(const std::span<const std::byte> raw)
-	{
-		if constexpr (detail::ChecksItsBytes<T>)
-		{
-			return T::SaveBytesValid(raw);
-		}
-		else
-		{
-			return true;
-		}
 	}
 
 	/* One saved type, as data: for reading a file that names a component. */

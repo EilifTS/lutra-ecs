@@ -128,15 +128,6 @@ TEST(SaveMembers, ASaveNameIsReadFromTheComponent)
 	ASSERT_TRUE(std::string_view(lcs::save::SaveNameOf<TSave::Leash>()) == "Leash");
 }
 
-TEST(SaveMembers, ABytesCheckIsOptionalAndTheDefaultIsYes)
-{
-	const TSave::Position position{ 1, 2 };
-
-	ASSERT_TRUE(lcs::save::SaveBytesAreValid<TSave::Position>(TSchema::BytesOf(position)));
-	ASSERT_TRUE(lcs::save::SaveBytesAreValid<TSave::Enemy>(TSchema::BytesOf(TSave::Enemy{ 1 })));
-	ASSERT_TRUE(!lcs::save::SaveBytesAreValid<TSave::Enemy>(TSchema::BytesOf(TSave::Enemy{ -1 })));
-}
-
 TEST(SaveMembers, ATransientTypeNeedsNoName)
 {
 	static_assert(!TSave::Intent::saved && !TSave::Pending::saved);

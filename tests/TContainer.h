@@ -656,24 +656,6 @@ TEST(Container, BytesAfterTheLastChunkAreRejected)
 	EXPECT_EQ(TContainer::ErrorOf(bytes), lcs::save::ErrorKind::Malformed);
 }
 
-/* What the reader checks is the structure; what a component says is the schema's to judge. */
-TEST(Container, ParsingDoesNotJudgeWhatAComponentSays)
-{
-	const auto bytes = TContainer::FileWithChunks([](lcs::save::ByteWriter& w) {
-		w.U32(1);
-		w.String(TContainer::enemy_name);
-		w.U32(uint32_t(sizeof(TSave::Enemy)));
-		w.U32(1);
-		w.U32(2);
-		w.Raw(TSave::Enemy{ -5 });
-	});
-
-	const auto parsed = TContainer::Parse(bytes);
-
-	ASSERT_TRUE(parsed.has_value());
-	EXPECT_FALSE(lcs::save::SaveBytesAreValid<TSave::Enemy>(parsed->chunks[0].Component(0)));
-}
-
 /*
  *  Chunks are named for their component
  */

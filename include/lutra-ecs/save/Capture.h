@@ -18,10 +18,9 @@
  *  and none of the Schema's transient types present. A debug build asserts both.
  *  Capture reads; it changes nothing.
  *
- *  A component is left out, and reported, when loading it back would fail:
- *  bytes the component calls invalid (a number that is not a number), or a policy
- *  that vetoes it. The game's own parts of a save -- name tables, sections --
- *  are the caller's to put in the Container afterwards.
+ *  A component is written as it is, whatever it holds, unless a policy vetoes it:
+ *  then it is left out and reported. The game's own parts of a save -- name
+ *  tables, sections -- are the caller's to put in the Container afterwards.
  */
 namespace lcs::save
 {
@@ -30,7 +29,7 @@ namespace lcs::save
 	{
 		Container<typename Ecs::EntityID> data{};
 
-		/* Components left out because loading them back would fail. Each was reported. */
+		/* Components a policy left out. Each was reported. */
 		size_t dropped_components{ 0 };
 	};
 
@@ -60,10 +59,9 @@ namespace lcs::save
 	 *     Verdict Accept(EntityID entity, T& copy);   // a template, or for chosen types only
 	 *
 	 * which is called with a copy of each plain component of a type it accepts (it is
-	 * a template, or overloaded, or constrained), after the component's own
-	 * SaveBytesValid has passed and before it is written. It may look at the copy (is
-	 * every handle in it nameable?) and it may remember it (which handles are used),
-	 * and says Keep or Drop(why). A type it has no Accept for is written as it is,
+	 * a template, or overloaded, or constrained), before it is written. It may look
+	 * at the copy (is every handle in it nameable?) and it may remember it (which
+	 * handles are used), and says Keep or Drop(why). A type it has no Accept for is written as it is,
 	 * and it is not called for tags, which are only an entity id. */
 	template <typename Schema, typename Policy = NoPolicy>
 	[[nodiscard]] CaptureResult<typename Schema::EcsType> Capture(typename Schema::EcsType& ecs, const Reporter& reporter, Policy&& policy = {})
@@ -102,12 +100,6 @@ namespace lcs::save
 				for (auto [entity, component] : ecs.template CView<T>())
 				{
 					T copy = component;
-
-					if (!SaveBytesAreValid<T>(std::as_bytes(std::span(&copy, 1))))
-					{
-						drop(name, entity, "its values are not ones a save can load back (a number that is not a number, or a value out of range)");
-						continue;
-					}
 
 					const Verdict verdict = detail::AskPolicy(policy, entity, copy);
 					if (verdict.kind != Verdict::Kind::Keep)

@@ -215,21 +215,6 @@ TEST(Capture, AnEmptyECSIsAnEmptyContainer)
 	ASSERT_TRUE(captured.data.entities.empty() && captured.data.chunks.empty());
 }
 
-TEST(Capture, AComponentWhoseValuesCannotBeLoadedBackIsLeftOutAndSaid)
-{
-	TRoundTrip::World world;
-	TRoundTrip::Log log;
-	world.ecs.GetComponent<TSave::Enemy>(world.a).strength = -4;
-
-	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter());
-
-	ASSERT_TRUE(captured.dropped_components == 1);
-	ASSERT_TRUE(lcs::save::FindChunk(captured.data, "Enemy") == nullptr);
-	ASSERT_TRUE(log.Has(lcs::save::Severity::Error, "Enemy", "entity 0 not saved"));
-	ASSERT_TRUE(world.ecs.HasComponent<TSave::Position>(world.a)); /* the rest of the entity is saved */
-	ASSERT_TRUE(lcs::save::FindChunk(captured.data, "Position") != nullptr);
-}
-
 TEST(Capture, ThePolicyCanRefuseAComponentWithAReason)
 {
 	TRoundTrip::World world;
@@ -301,19 +286,6 @@ TEST(Decode, AComponentOfAnEntityTheSaveDoesNotListIsAnError)
 	ASSERT_TRUE(!decoded.has_value());
 	ASSERT_TRUE(decoded.error().kind == lcs::save::ErrorKind::Malformed);
 	ASSERT_TRUE(decoded.error().message.find("entity 5") != std::string::npos);
-}
-
-TEST(Decode, ValuesTheComponentRejectsAreAnError)
-{
-	TRoundTrip::Data data = TRoundTrip::AContainer({ TSave::EntityID::CreateNew(3) });
-	lcs::save::AddComponent<TSave::MySchema>(data, data.entities[0], TSave::Enemy{ -1 });
-	TRoundTrip::Log log;
-
-	const auto decoded = lcs::save::Decode<TSave::MySchema>(data, log.Reporter());
-
-	ASSERT_TRUE(!decoded.has_value());
-	ASSERT_TRUE(decoded.error().kind == lcs::save::ErrorKind::Malformed);
-	ASSERT_TRUE(decoded.error().message.find("Enemy of entity 3") != std::string::npos);
 }
 
 TEST(Decode, ThePolicyCanChangeAComponentOnTheWayIn)

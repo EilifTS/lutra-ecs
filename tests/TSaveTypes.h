@@ -27,7 +27,6 @@ namespace TSave
 		int x, y;
 	};
 
-	/* strength must not be negative: what SaveBytesValid is for. */
 	struct Enemy
 	{
 		static constexpr lcs::ComponentType component_type = lcs::ComponentType::Component;
@@ -35,13 +34,6 @@ namespace TSave
 		static constexpr const char* save_name = "Enemy";
 
 		int strength;
-
-		static bool SaveBytesValid(const std::span<const std::byte> raw)
-		{
-			Enemy value;
-			std::memcpy(&value, raw.data(), sizeof(Enemy));
-			return value.strength >= 0;
-		}
 	};
 
 	/* Holds an entity id, which is a value like any other. */

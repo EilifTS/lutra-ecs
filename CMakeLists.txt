@@ -7,6 +7,7 @@ option(LUTRA_ECS_BUILD_TESTS "Build tests" ${PROJECT_IS_TOP_LEVEL})
 # Define library files
 file(GLOB LUTRA_ECS_INCLUDES CONFIGURE_DEPENDS
     include/lutra-ecs/*.h
+    include/lutra-ecs/save/*.h
 )
 
 # Create library
@@ -15,6 +16,8 @@ add_library(lutra-ecs::lutra-ecs ALIAS lutra-ecs)
 
 # Finish up library
 target_include_directories(lutra-ecs INTERFACE "include")
+# The save headers use std::expected.
+target_compile_features(lutra-ecs INTERFACE cxx_std_23)
 
 # Testing dependencies
 include(FetchContent)

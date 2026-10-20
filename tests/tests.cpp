@@ -1,10 +1,15 @@
 #include <gtest/gtest.h>
 
 #include "TBitMask.h"
+#include "TByteIO.h"
+#include "TContainer.h"
 #include "TDeferred.h"
 #include "TECS.h"
+#include "TFileIO.h"
 #include "THandle.h"
 #include "THandleFreeList.h"
+#include "TSaveRoundTrip.h"
+#include "TSchema.h"
 #include "TSparseSet.h"
 #include "TSparseTagSet.h"
 

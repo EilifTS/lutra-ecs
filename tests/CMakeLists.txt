@@ -1,14 +1,20 @@
 add_executable(tests
     tests.cpp
     TBitMask.h
+    TByteIO.h
+    TContainer.h
     TDeferred.h
     TECS.h
+    TFileIO.h
     THandle.h
     THandleFreeList.h
+    TSaveRoundTrip.h
+    TSaveTypes.h
+    TSchema.h
     TSparseSet.h
     TSparseTagSet.h
 )
-target_compile_features(tests PRIVATE cxx_std_20)
+target_compile_features(tests PRIVATE cxx_std_23)
 if (MSVC)
     target_compile_options(tests PRIVATE /W4)
 else()

@@ -3,6 +3,7 @@
 #include <lutra-ecs/SparseSetChunked.h>
 #include <lutra-ecs/HandleFreeList.h>
 #include <lutra-ecs/SparseTagSet.h>
+#include <lutra-ecs/TypeList.h>
 #include <lutra-ecs/Views.h>
 #include <algorithm>
 #include <array>
@@ -20,6 +21,9 @@ namespace lcs
 	{
 	public:
 		using EntityID = handle_t;
+
+		/* Every component and tag the ECS holds, for code that has to visit them all. */
+		using Types = TypeList<Ts...>;
 
 		ECSManager() { reserveComponentStorage(reserved_component_count); };
 
@@ -44,6 +48,9 @@ namespace lcs
 		template <typename T> inline void RemoveComponent(EntityID id);
 		template <typename T> inline void ClearComponent();
 		template <typename T> inline EntityID::data_t GetComponentCount();
+
+		/* No entity has a T. For a component or a tag alike. */
+		template <typename T> [[nodiscard]] inline bool IsEmpty();
 		template <typename T> inline std::span<T> GetComponentData();
 		template <typename T> inline ComponentView<EntityID, T> CView();
 
@@ -193,6 +200,20 @@ namespace lcs
 		using SetType = typename internal_ecs::GetComponentContainer<EntityID, T, T::component_type>::Container;
 		SetType& set = std::get<SetType>(component_sets);
 		return set.DenseSize();
+	}
+
+	template <typename EntityID, typename... Ts> template <typename T>
+	inline bool ECSManager<EntityID, Ts...>::IsEmpty()
+	{
+		if constexpr (T::component_type == ComponentType::Tag)
+		{
+			TagView<EntityID, T> view = TView<T>();
+			return view.begin() == view.end();
+		}
+		else
+		{
+			return GetComponentCount<T>() == 0;
+		}
 	}
 
 	template <typename EntityID, typename... Ts> template <typename T>

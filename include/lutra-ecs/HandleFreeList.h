@@ -102,6 +102,18 @@ namespace lcs
 			return handles[handle_index].GetIndex() == is_occupied_index;
 		}
 
+		/* Whether this exact handle is in use: its index is occupied and it carries the
+		 * validation id the index has now, so the id of an entity that was destroyed (and
+		 * of one whose index has been reused since) is not alive. The invalid handle never is. */
+		[[nodiscard]] inline bool IsAlive(handle_t handle) const
+		{
+			if (!handle.IsValid() || handle.GetIndex() >= MaxIndex())
+			{
+				return false;
+			}
+			return IsOccupied(handle.GetIndex()) && handles[handle.GetIndex()].GetValidationID() == handle.GetValidationID();
+		}
+
 		inline data_t MaxIndex() const
 		{
 			return data_t(handles.size());

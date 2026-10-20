@@ -41,6 +41,10 @@ namespace lcs
 		//inline const IndexFreeList::OccupiedIndicesContainer<true> EntitiesReverse() { return entity_id_generator.OccupiedIndicesReverse(); };
 		inline EntityID::data_t GetEntityCount();
 
+		/* Whether this exact id belongs to an entity that exists: not destroyed, and not
+		 * an index that has been reused since. */
+		[[nodiscard]] inline bool IsAlive(EntityID id) const { return entity_id_generator.IsAlive(id); }
+
 		/* Component */
 		template <typename T> inline bool HasComponent(EntityID id);
 		template <typename T> inline T& GetComponent(EntityID id);

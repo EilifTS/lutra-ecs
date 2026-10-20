@@ -36,24 +36,16 @@
  *
  *  It may carry more than the library reads (the game's own policy hooks, say);
  *  what the library reads is `id` (anything that converts to uint32_t, an enum
- *  class's value included, via static_cast), `name`, `ForEachEntityRef`,
- *  `dangling` and `Valid`. NoRules supplies the last three.
+ *  class's value included, via static_cast), `name`, `ForEachEntityRef`
+ *  and `Valid`. NoRules supplies the last two.
  */
 namespace lcs::save
 {
-	/* What to do with a saved entity id that the file does not hold. */
-	enum class OnDanglingRef
-	{
-		ClearTheRef,       /* Becomes the invalid id; the component stays. */
-		DropTheComponent,  /* The component means nothing without it. */
-	};
-
 	/* The base for a traits type: no entity ids, and any bytes will do. */
 	struct NoRules
 	{
 		/* Calls visit(EntityID&) for each entity id the component holds. */
 		template <typename C, typename V> static void ForEachEntityRef(C&, V&&) {}
-		static constexpr OnDanglingRef dangling = OnDanglingRef::ClearTheRef;
 
 		/* `raw` is exactly sizeof(component) bytes. */
 		static bool Valid(const std::span<const std::byte>) { return true; }

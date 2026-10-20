@@ -61,8 +61,10 @@ namespace lcs::save
 	 * component is left out and reported -- or Fail(why): the file cannot be used,
 	 * and the whole decode is an error. It is not called for tags.
 	 *
-	 * Entity ids are the library's: an id a component holds that the save does not
-	 * list is cleared or drops the component, as the component's traits say. */
+	 * Entity ids are the library's: a component that holds an id the save does not
+	 * list (and that is not the invalid id, which names nothing) is dropped and
+	 * reported, after the policy has seen it. A component that can live without
+	 * such an id should not be saved with one: see ClearDeadRefs. */
 	struct KeepEverything
 	{
 		template <typename EntityID, typename T>
@@ -152,21 +154,14 @@ namespace lcs::save
 				}
 
 				bool dangling_drop = false;
-				Traits::ForEachEntityRef(component, [&](EntityID& ref) {
+				Traits::ForEachEntityRef(component, [&](const EntityID ref) {
 					/* An id that was never set names nothing and stays that way. */
 					if (!ref.IsValid() || listed.contains(ref.handle))
 					{
 						return;
 					}
 
-					if (Traits::dangling == OnDanglingRef::ClearTheRef)
-					{
-						ref = EntityID{};
-					}
-					else
-					{
-						dangling_drop = true;
-					}
+					dangling_drop = true;
 				});
 				if (dangling_drop)
 				{

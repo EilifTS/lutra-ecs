@@ -376,8 +376,8 @@ TEST(Decode, ThePolicyIsNotAskedAboutTags)
 	ASSERT_TRUE(decoded->Of<TSave::Wet>().size() == 1);
 }
 
-/* The target is not in the save: the follower goes on following nobody. */
-TEST(Decode, AnEntityIdTheSaveDoesNotListIsClearedWhereTheComponentSurvivesWithoutIt)
+/* The target is not in the save: a reference to nothing is not what was saved, so the component is not loaded. */
+TEST(Decode, AnEntityIdTheSaveDoesNotListDropsTheComponentAndSaysSo)
 {
 	TRoundTrip::Data data = TRoundTrip::AContainer({ TSave::EntityID::CreateNew(0) });
 	lcs::save::AddComponent<TSave::MySchema>(data, data.entities[0], TSave::Follower{ TSave::EntityID::CreateNew(9) });
@@ -385,9 +385,9 @@ TEST(Decode, AnEntityIdTheSaveDoesNotListIsClearedWhereTheComponentSurvivesWitho
 
 	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(data, log);
 
-	ASSERT_TRUE(decoded.Of<TSave::Follower>().size() == 1);
-	ASSERT_TRUE(!decoded.Of<TSave::Follower>()[0].second.target.IsValid());
-	ASSERT_TRUE(decoded.dropped_components == 0);
+	ASSERT_TRUE(decoded.Of<TSave::Follower>().empty());
+	ASSERT_TRUE(decoded.dropped_components == 1);
+	ASSERT_TRUE(log.Has(lcs::save::Severity::Error, "Follower", "the entity it refers to is not in the save"));
 }
 
 TEST(Decode, AnEntityIdTheSaveListsIsLeftAlone)
@@ -415,7 +415,6 @@ TEST(Decode, AnEntityIdThatWasNeverSetStaysUnset)
 	ASSERT_TRUE(decoded.dropped_components == 0);
 }
 
-/* The anchor is not in the save: a leash with no anchor means nothing. */
 TEST(Decode, AnEntityIdTheSaveDoesNotListDropsAComponentThatNeedsIt)
 {
 	TRoundTrip::Data data = TRoundTrip::AContainer({ TSave::EntityID::CreateNew(0) });
@@ -598,4 +597,141 @@ TEST(RoundTrip, AWorldThroughTheBytesOfAFileComesBackTheSame)
 	TRoundTrip::Log second_log;
 	auto again = lcs::save::Capture<TSave::MySchema>(target, second_log.Reporter());
 	ASSERT_TRUE(lcs::save::Encode(again.data, TRoundTrip::format).size() == bytes.size());
+}
+
+/*
+ *  A reference that outlived its entity
+ */
+
+namespace TRoundTrip
+{
+	/* Clears dead references on the components that can live without them, like a game's capture policy would. */
+	struct ClearsDeadFollowTargets
+	{
+		TSave::ECS& ecs;
+		size_t cleared{ 0 };
+
+		template <typename T>
+		Verdict Accept(const EntityID, T& copy)
+		{
+			if constexpr (std::is_same_v<T, TSave::Follower>)
+			{
+				cleared += lcs::save::ClearDeadRefs<MySchema>(ecs, copy);
+			}
+			return Verdict::Keep();
+		}
+	};
+
+	/* b follows a, and a is then destroyed: nothing clears b's reference. */
+	struct WorldWithADeadTarget
+	{
+		ECS ecs;
+		EntityID follower, target;
+
+		WorldWithADeadTarget()
+		{
+			target = ecs.CreateEntity();
+			follower = ecs.CreateEntity();
+			ecs.AddComponent<TSave::Follower>(follower, { target });
+			ecs.AddComponent<TSave::Position>(follower, { 5, 5 });
+			ecs.DestroyEntity(target);
+		}
+	};
+}
+
+TEST(ClearDeadRefs, ClearsAReferenceToADestroyedEntity)
+{
+	TRoundTrip::WorldWithADeadTarget world;
+	TSave::Follower copy = world.ecs.GetComponent<TSave::Follower>(world.follower);
+
+	const size_t cleared = lcs::save::ClearDeadRefs<TSave::MySchema>(world.ecs, copy);
+
+	ASSERT_TRUE(cleared == 1);
+	ASSERT_TRUE(!copy.target.IsValid());
+}
+
+TEST(ClearDeadRefs, LeavesAReferenceToAnEntityThatExists)
+{
+	TSave::ECS ecs;
+	const TSave::EntityID target = ecs.CreateEntity();
+	TSave::Follower copy{ target };
+
+	const size_t cleared = lcs::save::ClearDeadRefs<TSave::MySchema>(ecs, copy);
+
+	ASSERT_TRUE(cleared == 0);
+	ASSERT_TRUE(copy.target == target);
+}
+
+TEST(ClearDeadRefs, LeavesAReferenceThatWasNeverSet)
+{
+	TSave::ECS ecs;
+	TSave::Follower copy{ TSave::EntityID{} };
+
+	ASSERT_TRUE(lcs::save::ClearDeadRefs<TSave::MySchema>(ecs, copy) == 0);
+}
+
+/* The index is in use again, by someone else: the old id is dead all the same. */
+TEST(ClearDeadRefs, ClearsAReferenceToAnIndexThatHasBeenReused)
+{
+	TSave::ECS ecs;
+	const TSave::EntityID old_target = ecs.CreateEntity();
+	ecs.DestroyEntity(old_target);
+	const TSave::EntityID new_entity = ecs.CreateEntity();
+	ASSERT_TRUE(new_entity.GetIndex() == old_target.GetIndex());
+	TSave::Follower copy{ old_target };
+
+	ASSERT_TRUE(lcs::save::ClearDeadRefs<TSave::MySchema>(ecs, copy) == 1);
+	ASSERT_TRUE(!copy.target.IsValid());
+}
+
+TEST(ClearDeadRefs, DoesNothingToAComponentWithNoReferences)
+{
+	TSave::ECS ecs;
+	TSave::Position copy{ 1, 2 };
+
+	ASSERT_TRUE(lcs::save::ClearDeadRefs<TSave::MySchema>(ecs, copy) == 0);
+	ASSERT_TRUE(copy.x == 1 && copy.y == 2);
+}
+
+/* Without the cleanup the stale reference is saved as it is, and decode refuses it. */
+TEST(DeadReference, IsDroppedOnLoadWhenNothingClearedItWhenSaved)
+{
+	TRoundTrip::WorldWithADeadTarget world;
+	TRoundTrip::Log log;
+	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter());
+
+	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(captured.data, log);
+
+	ASSERT_TRUE(decoded.Of<TSave::Follower>().empty());
+	ASSERT_TRUE(decoded.Of<TSave::Position>().size() == 1);
+	ASSERT_TRUE(decoded.dropped_components == 1);
+}
+
+/* With it, the component is saved without the reference and loads as it was. */
+TEST(DeadReference, IsClearedWhenSavedByAPolicyThatSaysTheComponentCanLiveWithoutIt)
+{
+	TRoundTrip::WorldWithADeadTarget world;
+	TRoundTrip::Log log;
+	TRoundTrip::ClearsDeadFollowTargets policy{ world.ecs };
+
+	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, policy, log.Reporter());
+	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(captured.data, log);
+
+	ASSERT_TRUE(policy.cleared == 1);
+	ASSERT_TRUE(captured.dropped_components == 0);
+	ASSERT_TRUE(decoded.Of<TSave::Follower>().size() == 1);
+	ASSERT_TRUE(!decoded.Of<TSave::Follower>()[0].second.target.IsValid());
+	ASSERT_TRUE(decoded.dropped_components == 0);
+	ASSERT_TRUE(log.lines.empty());
+}
+
+TEST(DeadReference, TheLiveECSIsNotChangedByTheCleanup)
+{
+	TRoundTrip::WorldWithADeadTarget world;
+	TRoundTrip::Log log;
+	TRoundTrip::ClearsDeadFollowTargets policy{ world.ecs };
+
+	(void)lcs::save::Capture<TSave::MySchema>(world.ecs, policy, log.Reporter());
+
+	ASSERT_TRUE(world.ecs.GetComponent<TSave::Follower>(world.follower).target == world.target);
 }

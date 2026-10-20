@@ -639,3 +639,72 @@ TEST(ECSRestore, RestoringNothingLeavesAWorkingEmptyECS)
 	ASSERT_TRUE(e.GetIndex() == 0);
 	ecs.AddComponent<TECSRestore::Position>(e, { 1, 1 });
 }
+
+/*
+ *  IsAlive
+ */
+
+TEST(ECSAlive, AnEntityThatWasCreatedIsAlive)
+{
+	TECS::ECS ecs;
+
+	const TECS::EntityID entity = ecs.CreateEntity();
+
+	ASSERT_TRUE(ecs.IsAlive(entity));
+}
+
+TEST(ECSAlive, AnEntityThatWasDestroyedIsNot)
+{
+	TECS::ECS ecs;
+	const TECS::EntityID entity = ecs.CreateEntity();
+	const TECS::EntityID other = ecs.CreateEntity();
+
+	ecs.DestroyEntity(entity);
+
+	ASSERT_TRUE(!ecs.IsAlive(entity));
+	ASSERT_TRUE(ecs.IsAlive(other));
+}
+
+/* The index is in use again, but the old id is not the entity that has it now. */
+TEST(ECSAlive, TheIdOfADestroyedEntityIsNotAliveWhenItsIndexIsReused)
+{
+	TECS::ECS ecs;
+	const TECS::EntityID old_entity = ecs.CreateEntity();
+	ecs.DestroyEntity(old_entity);
+
+	const TECS::EntityID new_entity = ecs.CreateEntity();
+
+	ASSERT_TRUE(new_entity.GetIndex() == old_entity.GetIndex());
+	ASSERT_TRUE(ecs.IsAlive(new_entity));
+	ASSERT_TRUE(!ecs.IsAlive(old_entity));
+}
+
+TEST(ECSAlive, TheInvalidIdAndIdsPastTheEndAreNotAlive)
+{
+	TECS::ECS ecs;
+	ecs.CreateEntity();
+
+	ASSERT_TRUE(!ecs.IsAlive(TECS::EntityID{}));
+	ASSERT_TRUE(!ecs.IsAlive(TECS::EntityID::CreateNew(40)));
+}
+
+TEST(ECSAlive, NothingIsAliveAfterClear)
+{
+	TECS::ECS ecs;
+	const TECS::EntityID entity = ecs.CreateEntity();
+
+	ecs.Clear();
+
+	ASSERT_TRUE(!ecs.IsAlive(entity));
+}
+
+TEST(ECSAlive, RestoredEntitiesAreAliveUnderTheirOwnIds)
+{
+	TECS::ECS ecs;
+	const std::vector<TECS::EntityID> ids{ TECS::EntityID::CreateNew(1), TECS::EntityID::CreateNew(4) };
+
+	ecs.CreateEntitiesFromIDs(ids);
+
+	ASSERT_TRUE(ecs.IsAlive(ids[0]) && ecs.IsAlive(ids[1]));
+	ASSERT_TRUE(!ecs.IsAlive(TECS::EntityID::CreateNew(2)));
+}

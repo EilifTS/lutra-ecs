@@ -30,14 +30,14 @@ namespace TSave
 		int strength;
 	};
 
-	/* Keeps working without its target. */
+	/* Can live without its target, if whoever saves it clears a dead one (ClearDeadRefs). */
 	struct Follower
 	{
 		static constexpr lcs::ComponentType component_type = lcs::ComponentType::Component;
 		EntityID target;
 	};
 
-	/* Means nothing without its anchor. */
+	/* Means nothing without its anchor, so nothing clears a dead one: it is dropped on load. */
 	struct Leash
 	{
 		static constexpr lcs::ComponentType component_type = lcs::ComponentType::Component;
@@ -98,7 +98,6 @@ namespace TSave
 	{
 		static constexpr uint32_t id = 4;
 		static constexpr const char* name = "Leash";
-		static constexpr lcs::save::OnDanglingRef dangling = lcs::save::OnDanglingRef::DropTheComponent;
 		template <typename C, typename V> static void ForEachEntityRef(C& c, V&& visit) { visit(c.anchor); }
 	};
 

@@ -36,47 +36,10 @@ TEST(Schema, HasOneEntryPerSavedTypeInListOrder)
 
 TEST(Schema, EntriesSayHowBigAComponentIsAndWhetherItIsATag)
 {
-	const lcs::save::SchemaEntry* position = TSchema::MySchema::Find("Position");
-	const lcs::save::SchemaEntry* wet = TSchema::MySchema::Find("Wet");
+	const auto& entries = TSchema::MySchema::entries;
 
-	ASSERT_TRUE(position != nullptr && wet != nullptr);
-	ASSERT_TRUE(position->size == sizeof(TSave::Position) && !position->is_tag);
-	ASSERT_TRUE(wet->size == 0 && wet->is_tag);
-}
-
-TEST(Schema, FindIsNullForANameThisBuildDoesNotKnow)
-{
-	ASSERT_TRUE(TSchema::MySchema::Find("Mystery") == nullptr);
-	ASSERT_TRUE(TSchema::MySchema::Find("") == nullptr);
-	ASSERT_TRUE(TSchema::MySchema::Find("position") == nullptr); /* names are exact */
-}
-
-TEST(Schema, BytesThatAreInRangeAreValid)
-{
-	ASSERT_TRUE(TSchema::MySchema::BytesAreValid("Enemy", TSchema::BytesOf(TSave::Enemy{ 5 })));
-}
-
-TEST(Schema, BytesThatTheComponentRejectsAreNotValid)
-{
-	ASSERT_TRUE(!TSchema::MySchema::BytesAreValid("Enemy", TSchema::BytesOf(TSave::Enemy{ -1 })));
-}
-
-TEST(Schema, BytesOfTheWrongSizeAreNotValid)
-{
-	const std::array<std::byte, 3> short_bytes{};
-
-	ASSERT_TRUE(!TSchema::MySchema::BytesAreValid("Enemy", short_bytes));
-	ASSERT_TRUE(!TSchema::MySchema::BytesAreValid("Wet", TSchema::BytesOf(TSave::Enemy{ 1 })));
-}
-
-TEST(Schema, BytesOfAnUnknownNameAreNotValid)
-{
-	ASSERT_TRUE(!TSchema::MySchema::BytesAreValid("Mystery", TSchema::BytesOf(TSave::Enemy{ 1 })));
-}
-
-TEST(Schema, AnEmptyTagHasNoBytesAndIsValid)
-{
-	ASSERT_TRUE(TSchema::MySchema::BytesAreValid("Wet", {}));
+	ASSERT_TRUE(entries[0].size == sizeof(TSave::Position) && !entries[0].is_tag);
+	ASSERT_TRUE(entries[4].size == 0 && entries[4].is_tag);
 }
 
 TEST(Schema, ForEachSavedVisitsEverySavedTypeInOrder)
@@ -154,8 +117,6 @@ namespace TSchema
 
 	static_assert(lcs::IsOneOf<int>(lcs::TypeList<char, int>{}));
 	static_assert(!lcs::IsOneOf<long>(lcs::TypeList<char, int>{}));
-	static_assert(lcs::EveryTypeIsIn(lcs::TypeList<int>{}, lcs::TypeList<char, int>{}));
-	static_assert(!lcs::EveryTypeIsIn(lcs::TypeList<int, long>{}, lcs::TypeList<char, int>{}));
 }
 
 /*
@@ -179,5 +140,5 @@ TEST(SaveMembers, ABytesCheckIsOptionalAndTheDefaultIsYes)
 TEST(SaveMembers, ATransientTypeNeedsNoName)
 {
 	static_assert(!TSave::Intent::saved && !TSave::Pending::saved);
-	ASSERT_TRUE(TSchema::MySchema::Find("Position") != nullptr);
+	ASSERT_TRUE(TSchema::MySchema::entries.size() == 5);
 }

@@ -20,13 +20,6 @@ namespace lcs
 		return {};
 	}
 
-	/* Every type of the first list is in the second. */
-	template <typename... Ts, typename... Packed>
-	constexpr bool EveryTypeIsIn(TypeList<Ts...>, TypeList<Packed...> pack)
-	{
-		return (IsOneOf<Ts>(pack) && ...);
-	}
-
 	/* Calls visit(std::type_identity<T>{}) for each type, in list order. */
 	template <typename Visitor, typename... Ts>
 	void ForEachType(TypeList<Ts...>, Visitor&& visit)

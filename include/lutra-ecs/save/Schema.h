@@ -180,38 +180,6 @@ namespace lcs::save
 			return detail::MakeEntry<T>();
 		}
 
-		/* Null for a name this build does not know. */
-		static const SchemaEntry* Find(const std::string_view name)
-		{
-			for (const SchemaEntry& entry : entries)
-			{
-				if (entry.name == name) return &entry;
-			}
-			return nullptr;
-		}
-
-		/* Whether the bytes of one component, of the type with this name, are safe to
-		 * use. False for a name this build does not know, and for `raw` that is not
-		 * exactly the component's size. */
-		static bool BytesAreValid(const std::string_view name, const std::span<const std::byte> raw)
-		{
-			const SchemaEntry* entry = Find(name);
-			if (entry == nullptr || raw.size() != entry->size)
-			{
-				return false;
-			}
-
-			bool valid = true;
-			ForEachSaved([&](auto type) {
-				using T = typename decltype(type)::type;
-				if (std::string_view(SaveNameOf<T>()) == name)
-				{
-					valid = SaveBytesAreValid<T>(raw);
-				}
-			});
-			return valid;
-		}
-
 		/* Calls visit(std::type_identity<T>{}) for each saved type, in the ECS's order. */
 		template <typename Visitor>
 		static void ForEachSaved(Visitor&& visit)

@@ -671,7 +671,7 @@ TEST(Container, ParsingDoesNotJudgeWhatAComponentSays)
 	const auto parsed = TContainer::Parse(bytes);
 
 	ASSERT_TRUE(parsed.has_value());
-	EXPECT_FALSE(TContainer::MySchema::BytesAreValid(parsed->chunks[0].name, parsed->chunks[0].Component(0)));
+	EXPECT_FALSE(lcs::save::SaveBytesAreValid<TSave::Enemy>(parsed->chunks[0].Component(0)));
 }
 
 /*

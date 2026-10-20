@@ -170,14 +170,14 @@ TEST(Capture, WritesEachComponentOfEachSavedTypeUnderItsEntity)
 
 	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter());
 
-	const auto* positions = lcs::save::FindChunk(captured.data, 1);
+	const auto* positions = lcs::save::FindChunk(captured.data, "Position");
 	ASSERT_TRUE(positions != nullptr && positions->Count() == 2);
 	ASSERT_TRUE(lcs::save::ReadComponent<TSave::Position>(*positions, 0).y == 2 || lcs::save::ReadComponent<TSave::Position>(*positions, 1).y == 2);
 
-	const auto* wet = lcs::save::FindChunk(captured.data, 100);
+	const auto* wet = lcs::save::FindChunk(captured.data, "Wet");
 	ASSERT_TRUE(wet != nullptr && wet->Count() == 1 && wet->entities[0] == world.a);
 
-	const auto* leash = lcs::save::FindChunk(captured.data, 4);
+	const auto* leash = lcs::save::FindChunk(captured.data, "Leash");
 	ASSERT_TRUE(leash != nullptr && leash->entities[0] == world.c);
 	ASSERT_TRUE(lcs::save::ReadComponent<TSave::Leash>(*leash, 0).anchor == world.a);
 }
@@ -190,7 +190,7 @@ TEST(Capture, LeavesOutATypeNobodyHas)
 
 	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter());
 
-	ASSERT_TRUE(lcs::save::FindChunk(captured.data, 2) == nullptr);
+	ASSERT_TRUE(lcs::save::FindChunk(captured.data, "Enemy") == nullptr);
 }
 
 TEST(Capture, ChangesNothingInTheECS)
@@ -224,10 +224,10 @@ TEST(Capture, AComponentWhoseValuesCannotBeLoadedBackIsLeftOutAndSaid)
 	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter());
 
 	ASSERT_TRUE(captured.dropped_components == 1);
-	ASSERT_TRUE(lcs::save::FindChunk(captured.data, 2) == nullptr);
+	ASSERT_TRUE(lcs::save::FindChunk(captured.data, "Enemy") == nullptr);
 	ASSERT_TRUE(log.Has(lcs::save::Severity::Error, "Enemy", "entity 0 not saved"));
 	ASSERT_TRUE(world.ecs.HasComponent<TSave::Position>(world.a)); /* the rest of the entity is saved */
-	ASSERT_TRUE(lcs::save::FindChunk(captured.data, 1) != nullptr);
+	ASSERT_TRUE(lcs::save::FindChunk(captured.data, "Position") != nullptr);
 }
 
 TEST(Capture, ThePolicyCanRefuseAComponentWithAReason)
@@ -239,7 +239,7 @@ TEST(Capture, ThePolicyCanRefuseAComponentWithAReason)
 	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, policy, log.Reporter());
 
 	ASSERT_TRUE(captured.dropped_components == 1);
-	ASSERT_TRUE(lcs::save::FindChunk(captured.data, 2) == nullptr);
+	ASSERT_TRUE(lcs::save::FindChunk(captured.data, "Enemy") == nullptr);
 	ASSERT_TRUE(log.Has(lcs::save::Severity::Error, "Enemy", "too strong to keep"));
 }
 
@@ -432,12 +432,12 @@ TEST(Decode, AComponentThisBuildDoesNotKnowIsReportedAsAWarningAndTheRestLoads)
 {
 	TRoundTrip::Data data = TRoundTrip::AContainer({ TSave::EntityID::CreateNew(0) });
 	lcs::save::AddComponent<TSave::MySchema>(data, data.entities[0], TSave::Position{ 1, 1 });
-	data.skipped_component_ids.push_back(9999);
+	data.skipped_component_names.push_back("Mystery");
 	TRoundTrip::Log log;
 
 	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(data, log);
 
-	ASSERT_TRUE(log.Has(lcs::save::Severity::Warning, "save", "9999"));
+	ASSERT_TRUE(log.Has(lcs::save::Severity::Warning, "save", "'Mystery'"));
 	ASSERT_TRUE(decoded.Of<TSave::Position>().size() == 1);
 }
 

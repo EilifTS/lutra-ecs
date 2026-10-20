@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <string_view>
 #include <type_traits>
 
 #include <lutra-ecs/ECSManager.h>
@@ -20,8 +21,7 @@
  *      {
  *          static constexpr lcs::ComponentType component_type = lcs::ComponentType::Component;
  *          static constexpr bool saved = true;
- *          static constexpr uint32_t save_id = 1;              // never changed or reused
- *          static constexpr const char* save_name = "Position"; // for messages
+ *          static constexpr const char* save_name = "Position"; // what the file calls it
  *
  *          float x, y;
  *
@@ -52,7 +52,7 @@
  *
  *  Every component and tag of the ECS says whether it is saved. One that does not
  *  breaks the build, so none goes missing from every save unnoticed; one that is
- *  saved without a save_id or a save_name does too. The saved types are visited in
+ *  saved without a save_name does too. The saved types are visited in
  *  the order the ECS lists its types. A game's own hooks (the policies of Capture
  *  and Decode) can look for members of their own in the same way.
  */
@@ -64,10 +64,7 @@ namespace lcs::save
 		concept SaysWhetherItIsSaved = requires { { T::saved } -> std::convertible_to<bool>; };
 
 		template <typename T>
-		concept HasSaveIdAndName = requires {
-			{ static_cast<uint32_t>(T::save_id) };
-			{ T::save_name } -> std::convertible_to<const char*>;
-		};
+		concept HasSaveName = requires { { T::save_name } -> std::convertible_to<const char*>; };
 
 		template <typename T>
 		concept ChecksItsBytes = requires (std::span<const std::byte> raw) { { T::SaveBytesValid(raw) } -> std::convertible_to<bool>; };
@@ -76,13 +73,9 @@ namespace lcs::save
 		concept HoldsEntityIds = requires (T& component) { component.ForEachEntityRef([](auto&) {}); };
 	}
 
-	/* The id a saved type is written under. */
-	template <typename T>
-	constexpr uint32_t SaveIdOf()
-	{
-		return static_cast<uint32_t>(T::save_id);
-	}
-
+	/* The name a saved type is written under: the identity of the component in a file,
+	 * so it is never changed (a renamed component is a component the file does not
+	 * know). */
 	template <typename T>
 	constexpr const char* SaveNameOf()
 	{
@@ -115,22 +108,21 @@ namespace lcs::save
 		}
 	}
 
-	/* One saved type, as data: for reading a file that names a component by id. */
+	/* One saved type, as data: for reading a file that names a component. */
 	struct SchemaEntry
 	{
-		uint32_t id;
-		const char* name;
+		std::string_view name;
 		uint32_t size; /* Bytes of one component; 0 for a tag. */
 		bool is_tag;
 	};
 
-	constexpr bool IdsAreUnique(const std::span<const SchemaEntry> entries)
+	constexpr bool NamesAreUnique(const std::span<const SchemaEntry> entries)
 	{
 		for (size_t a = 0; a < entries.size(); a++)
 		{
 			for (size_t b = a + 1; b < entries.size(); b++)
 			{
-				if (entries[a].id == entries[b].id) return false;
+				if (entries[a].name == entries[b].name) return false;
 			}
 		}
 		return true;
@@ -143,7 +135,7 @@ namespace lcs::save
 		struct Decision
 		{
 			static_assert(SaysWhetherItIsSaved<T>,
-				"a component of the ECS does not say whether it is saved: give it `static constexpr bool saved = false;` if it is transient, or `= true` with a save_id that is never reused and a save_name");
+				"a component of the ECS does not say whether it is saved: give it `static constexpr bool saved = false;` if it is transient, or `= true` with a save_name that is never changed");
 
 			static constexpr bool saved = [] {
 				if constexpr (SaysWhetherItIsSaved<T>) return bool(T::saved);
@@ -156,10 +148,10 @@ namespace lcs::save
 		{
 			/* Raw bytes only work for a type that can be copied as bytes. */
 			static_assert(std::is_trivially_copyable_v<T>, "a saved component is written as its bytes");
-			static_assert(HasSaveIdAndName<T>, "a saved component needs `static constexpr uint32_t save_id` (never reused) and `static constexpr const char* save_name`");
+			static_assert(HasSaveName<T>, "a saved component needs `static constexpr const char* save_name`, which is what a file calls it and is never changed");
 
 			constexpr bool is_tag = T::component_type == ComponentType::Tag;
-			return SchemaEntry{ SaveIdOf<T>(), SaveNameOf<T>(), is_tag ? 0u : uint32_t(sizeof(T)), is_tag };
+			return SchemaEntry{ SaveNameOf<T>(), is_tag ? 0u : uint32_t(sizeof(T)), is_tag };
 		}
 
 		template <typename... Ts>
@@ -197,7 +189,7 @@ namespace lcs::save
 
 		static constexpr auto entries = detail::MakeEntries(SavedTypes{});
 
-		static_assert(IdsAreUnique(entries), "two saved components share an id");
+		static_assert(NamesAreUnique(entries), "two saved components share a save_name");
 
 		template <typename T>
 		static constexpr SchemaEntry EntryOf()
@@ -206,22 +198,22 @@ namespace lcs::save
 			return detail::MakeEntry<T>();
 		}
 
-		/* Null for an id this build does not know. */
-		static const SchemaEntry* Find(const uint32_t id)
+		/* Null for a name this build does not know. */
+		static const SchemaEntry* Find(const std::string_view name)
 		{
 			for (const SchemaEntry& entry : entries)
 			{
-				if (entry.id == id) return &entry;
+				if (entry.name == name) return &entry;
 			}
 			return nullptr;
 		}
 
-		/* Whether the bytes of one component, of the type with this id, are safe to
-		 * use. False for an id this build does not know, and for `raw` that is not
+		/* Whether the bytes of one component, of the type with this name, are safe to
+		 * use. False for a name this build does not know, and for `raw` that is not
 		 * exactly the component's size. */
-		static bool BytesAreValid(const uint32_t id, const std::span<const std::byte> raw)
+		static bool BytesAreValid(const std::string_view name, const std::span<const std::byte> raw)
 		{
-			const SchemaEntry* entry = Find(id);
+			const SchemaEntry* entry = Find(name);
 			if (entry == nullptr || raw.size() != entry->size)
 			{
 				return false;
@@ -230,7 +222,7 @@ namespace lcs::save
 			bool valid = true;
 			ForEachSaved([&](auto type) {
 				using T = typename decltype(type)::type;
-				if (SaveIdOf<T>() == id)
+				if (std::string_view(SaveNameOf<T>()) == name)
 				{
 					valid = SaveBytesAreValid<T>(raw);
 				}

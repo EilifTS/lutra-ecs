@@ -29,53 +29,54 @@ TEST(Schema, HasOneEntryPerSavedTypeInListOrder)
 	const auto& entries = TSchema::MySchema::entries;
 
 	ASSERT_TRUE(entries.size() == 5);
-	ASSERT_TRUE(entries[0].id == 1 && std::string_view(entries[0].name) == "Position");
-	ASSERT_TRUE(entries[1].id == 2 && std::string_view(entries[1].name) == "Enemy");
-	ASSERT_TRUE(entries[4].id == 100 && std::string_view(entries[4].name) == "Wet");
+	ASSERT_TRUE(entries[0].name == "Position");
+	ASSERT_TRUE(entries[1].name == "Enemy");
+	ASSERT_TRUE(entries[4].name == "Wet");
 }
 
 TEST(Schema, EntriesSayHowBigAComponentIsAndWhetherItIsATag)
 {
-	const lcs::save::SchemaEntry* position = TSchema::MySchema::Find(1);
-	const lcs::save::SchemaEntry* wet = TSchema::MySchema::Find(100);
+	const lcs::save::SchemaEntry* position = TSchema::MySchema::Find("Position");
+	const lcs::save::SchemaEntry* wet = TSchema::MySchema::Find("Wet");
 
 	ASSERT_TRUE(position != nullptr && wet != nullptr);
 	ASSERT_TRUE(position->size == sizeof(TSave::Position) && !position->is_tag);
 	ASSERT_TRUE(wet->size == 0 && wet->is_tag);
 }
 
-TEST(Schema, FindIsNullForAnIdThisBuildDoesNotKnow)
+TEST(Schema, FindIsNullForANameThisBuildDoesNotKnow)
 {
-	ASSERT_TRUE(TSchema::MySchema::Find(9999) == nullptr);
-	ASSERT_TRUE(TSchema::MySchema::Find(0) == nullptr);
+	ASSERT_TRUE(TSchema::MySchema::Find("Mystery") == nullptr);
+	ASSERT_TRUE(TSchema::MySchema::Find("") == nullptr);
+	ASSERT_TRUE(TSchema::MySchema::Find("position") == nullptr); /* names are exact */
 }
 
 TEST(Schema, BytesThatAreInRangeAreValid)
 {
-	ASSERT_TRUE(TSchema::MySchema::BytesAreValid(2, TSchema::BytesOf(TSave::Enemy{ 5 })));
+	ASSERT_TRUE(TSchema::MySchema::BytesAreValid("Enemy", TSchema::BytesOf(TSave::Enemy{ 5 })));
 }
 
 TEST(Schema, BytesThatTheComponentRejectsAreNotValid)
 {
-	ASSERT_TRUE(!TSchema::MySchema::BytesAreValid(2, TSchema::BytesOf(TSave::Enemy{ -1 })));
+	ASSERT_TRUE(!TSchema::MySchema::BytesAreValid("Enemy", TSchema::BytesOf(TSave::Enemy{ -1 })));
 }
 
 TEST(Schema, BytesOfTheWrongSizeAreNotValid)
 {
 	const std::array<std::byte, 3> short_bytes{};
 
-	ASSERT_TRUE(!TSchema::MySchema::BytesAreValid(2, short_bytes));
-	ASSERT_TRUE(!TSchema::MySchema::BytesAreValid(100, TSchema::BytesOf(TSave::Enemy{ 1 })));
+	ASSERT_TRUE(!TSchema::MySchema::BytesAreValid("Enemy", short_bytes));
+	ASSERT_TRUE(!TSchema::MySchema::BytesAreValid("Wet", TSchema::BytesOf(TSave::Enemy{ 1 })));
 }
 
-TEST(Schema, BytesOfAnUnknownIdAreNotValid)
+TEST(Schema, BytesOfAnUnknownNameAreNotValid)
 {
-	ASSERT_TRUE(!TSchema::MySchema::BytesAreValid(9999, TSchema::BytesOf(TSave::Enemy{ 1 })));
+	ASSERT_TRUE(!TSchema::MySchema::BytesAreValid("Mystery", TSchema::BytesOf(TSave::Enemy{ 1 })));
 }
 
 TEST(Schema, AnEmptyTagHasNoBytesAndIsValid)
 {
-	ASSERT_TRUE(TSchema::MySchema::BytesAreValid(100, {}));
+	ASSERT_TRUE(TSchema::MySchema::BytesAreValid("Wet", {}));
 }
 
 TEST(Schema, ForEachSavedVisitsEverySavedTypeInOrder)
@@ -146,10 +147,10 @@ namespace TSchema
 {
 	static_assert(std::is_same_v<TSave::ECS::Types, lcs::TypeList<TSave::Position, TSave::Enemy, TSave::Follower, TSave::Leash, TSave::Wet, TSave::Intent, TSave::Pending>>);
 
-	static_assert(lcs::save::IdsAreUnique(MySchema::entries));
-	static_assert(lcs::save::IdsAreUnique(std::array<lcs::save::SchemaEntry, 0>{}));
-	static_assert(!lcs::save::IdsAreUnique(std::array<lcs::save::SchemaEntry, 2>{ lcs::save::SchemaEntry{ 7, "a", 4, false }, lcs::save::SchemaEntry{ 7, "b", 4, false } }),
-		"a repeated id is caught");
+	static_assert(lcs::save::NamesAreUnique(MySchema::entries));
+	static_assert(lcs::save::NamesAreUnique(std::array<lcs::save::SchemaEntry, 0>{}));
+	static_assert(!lcs::save::NamesAreUnique(std::array<lcs::save::SchemaEntry, 2>{ lcs::save::SchemaEntry{ "a", 4, false }, lcs::save::SchemaEntry{ "a", 8, false } }),
+		"a repeated name is caught");
 
 	static_assert(lcs::IsOneOf<int>(lcs::TypeList<char, int>{}));
 	static_assert(!lcs::IsOneOf<long>(lcs::TypeList<char, int>{}));
@@ -161,9 +162,8 @@ namespace TSchema
  *  What a component says about itself, and what it need not say
  */
 
-TEST(SaveMembers, ASaveIdAndNameAreReadFromTheComponent)
+TEST(SaveMembers, ASaveNameIsReadFromTheComponent)
 {
-	ASSERT_TRUE(lcs::save::SaveIdOf<TSave::Leash>() == 4);
 	ASSERT_TRUE(std::string_view(lcs::save::SaveNameOf<TSave::Leash>()) == "Leash");
 }
 
@@ -190,8 +190,8 @@ TEST(SaveMembers, EntityIdsAreOptionalAndTheDefaultIsNone)
 	ASSERT_TRUE(!follower.target.IsValid());
 }
 
-TEST(SaveMembers, ATransientTypeNeedsNoIdOrName)
+TEST(SaveMembers, ATransientTypeNeedsNoName)
 {
 	static_assert(!TSave::Intent::saved && !TSave::Pending::saved);
-	ASSERT_TRUE(TSchema::MySchema::Find(1) != nullptr);
+	ASSERT_TRUE(TSchema::MySchema::Find("Position") != nullptr);
 }

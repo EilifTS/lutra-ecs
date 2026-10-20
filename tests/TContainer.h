@@ -30,9 +30,9 @@ namespace TContainer
 	using Data = lcs::save::Container<EntityID>;
 	using Chunk = lcs::save::ComponentChunk<EntityID>;
 
-	constexpr uint32_t position_id = 1;
-	constexpr uint32_t enemy_id = 2;
-	constexpr uint32_t wet_id = 100;
+	constexpr const char* position_name = "Position";
+	constexpr const char* enemy_name = "Enemy";
+	constexpr const char* wet_name = "Wet";
 	constexpr size_t name_tables = 3;
 
 	constexpr lcs::save::Format format{ .magic = 0x5354554Cu, .version = 3, .name_table_count = name_tables, .max_name_length = 1024 };
@@ -137,12 +137,12 @@ TEST(Container, ASaveComesBackAsItWasWritten)
 	ASSERT_EQ(parsed->chunks.size(), saved.chunks.size());
 	for (size_t i = 0; i < saved.chunks.size(); i++)
 	{
-		EXPECT_EQ(parsed->chunks[i].component_id, saved.chunks[i].component_id);
+		EXPECT_EQ(parsed->chunks[i].name, saved.chunks[i].name);
 		EXPECT_EQ(parsed->chunks[i].size, saved.chunks[i].size);
 		EXPECT_EQ(parsed->chunks[i].entities, saved.chunks[i].entities);
 		EXPECT_EQ(parsed->chunks[i].bytes, saved.chunks[i].bytes);
 	}
-	EXPECT_TRUE(parsed->skipped_component_ids.empty());
+	EXPECT_TRUE(parsed->skipped_component_names.empty());
 }
 
 TEST(Container, TheComponentsInAChunkAreReadBackByTypeAndIndex)
@@ -150,18 +150,18 @@ TEST(Container, TheComponentsInAChunkAreReadBackByTypeAndIndex)
 	const auto parsed = TContainer::Parse(TContainer::Encode(TContainer::ASave()));
 	ASSERT_TRUE(parsed.has_value());
 
-	const TContainer::Chunk* positions = lcs::save::FindChunk(*parsed, TContainer::position_id);
+	const TContainer::Chunk* positions = lcs::save::FindChunk(*parsed, TContainer::position_name);
 	ASSERT_NE(positions, nullptr);
 	ASSERT_EQ(positions->Count(), 2u);
 	EXPECT_EQ(positions->entities[1], TSave::EntityID::CreateNew(2));
 	EXPECT_EQ(lcs::save::ReadComponent<TSave::Position>(*positions, 1).y, 5);
 
-	const TContainer::Chunk* tags = lcs::save::FindChunk(*parsed, TContainer::wet_id);
+	const TContainer::Chunk* tags = lcs::save::FindChunk(*parsed, TContainer::wet_name);
 	ASSERT_NE(tags, nullptr);
 	EXPECT_EQ(tags->Count(), 2u);
 	EXPECT_EQ(tags->size, 0u);
 	EXPECT_TRUE(tags->bytes.empty());
-	EXPECT_EQ(lcs::save::FindChunk(*parsed, uint32_t(3)), nullptr);
+	EXPECT_EQ(lcs::save::FindChunk(*parsed, "Follower"), nullptr);
 }
 
 TEST(Container, AnEmptySaveIsASave)
@@ -375,7 +375,7 @@ TEST(Container, ABitFlippedInAComponentFailsTheChecksum)
 {
 	const TContainer::Data data = TContainer::ASave();
 	std::vector<std::byte> bytes = TContainer::Encode(data);
-	const TContainer::Chunk* chunk = lcs::save::FindChunk(data, TContainer::position_id);
+	const TContainer::Chunk* chunk = lcs::save::FindChunk(data, TContainer::position_name);
 	ASSERT_NE(chunk, nullptr);
 	const auto where = std::search(bytes.begin(), bytes.end(), chunk->bytes.begin(), chunk->bytes.end());
 	ASSERT_NE(where, bytes.end());
@@ -451,7 +451,7 @@ TEST(Container, AChunkThatHoldsMoreThanTheFileIsRejected)
 {
 	const auto bytes = TContainer::FileWithChunks([](lcs::save::ByteWriter& w) {
 		w.U32(1);
-		w.U32(TContainer::position_id);
+		w.String(TContainer::position_name);
 		w.U32(uint32_t(sizeof(TSave::Position)));
 		w.U32(0x7FFFFFFFu);
 	});
@@ -464,7 +464,7 @@ TEST(Container, AChunkWhoseSizeTimesCountWrapsIsRejected)
 {
 	const auto bytes = TContainer::FileWithChunks([](lcs::save::ByteWriter& w) {
 		w.U32(1);
-		w.U32(9999); /* an id no one knows, so it would be skipped */
+		w.String("Mystery"); /* a name no one knows, so it would be skipped */
 		w.U32(0xFFFFFFF0u);
 		w.U32(0x00020000u);
 	});
@@ -549,13 +549,13 @@ TEST(Container, AChunkOfAnUnknownComponentIsSkippedAndTheRestIsRead)
 	const auto bytes = TContainer::FileWithChunks([](lcs::save::ByteWriter& w) {
 		w.U32(2);
 
-		w.U32(9999); /* unknown, 12 bytes of component for each of 2 entities */
+		w.String("Mystery"); /* unknown, 12 bytes of component for each of 2 entities */
 		w.U32(12);
 		w.U32(2);
 		w.U32(3); w.U32(4);
 		for (int i = 0; i < 24; i++) w.Raw(uint8_t(0xAB));
 
-		w.U32(TContainer::enemy_id);
+		w.String(TContainer::enemy_name);
 		w.U32(uint32_t(sizeof(TSave::Enemy)));
 		w.U32(1);
 		w.U32(6);
@@ -565,8 +565,8 @@ TEST(Container, AChunkOfAnUnknownComponentIsSkippedAndTheRestIsRead)
 	const auto parsed = TContainer::Parse(bytes);
 
 	ASSERT_TRUE(parsed.has_value()) << parsed.error().message;
-	ASSERT_EQ(parsed->skipped_component_ids.size(), 1u);
-	EXPECT_EQ(parsed->skipped_component_ids[0], 9999u);
+	ASSERT_EQ(parsed->skipped_component_names.size(), 1u);
+	EXPECT_EQ(parsed->skipped_component_names[0], "Mystery");
 	ASSERT_EQ(parsed->chunks.size(), 1u);
 	EXPECT_EQ(lcs::save::ReadComponent<TSave::Enemy>(parsed->chunks[0], 0).strength, 25);
 }
@@ -576,7 +576,7 @@ TEST(Container, AKnownComponentWithAnotherSizeIsRejectedAndNamed)
 {
 	const auto bytes = TContainer::FileWithChunks([](lcs::save::ByteWriter& w) {
 		w.U32(1);
-		w.U32(TContainer::position_id);
+		w.String(TContainer::position_name);
 		w.U32(uint32_t(sizeof(TSave::Position) + 4));
 		w.U32(0);
 	});
@@ -592,7 +592,7 @@ TEST(Container, ATagWithBytesIsRejected)
 {
 	const auto bytes = TContainer::FileWithChunks([](lcs::save::ByteWriter& w) {
 		w.U32(1);
-		w.U32(TContainer::wet_id);
+		w.String(TContainer::wet_name);
 		w.U32(4);
 		w.U32(0);
 	});
@@ -606,7 +606,7 @@ TEST(Container, TwoChunksOfTheSameComponentAreRejected)
 		w.U32(2);
 		for (int i = 0; i < 2; i++)
 		{
-			w.U32(TContainer::enemy_id);
+			w.String(TContainer::enemy_name);
 			w.U32(uint32_t(sizeof(TSave::Enemy)));
 			w.U32(1);
 			w.U32(uint32_t(i));
@@ -621,7 +621,7 @@ TEST(Container, AnEntityWithTheSameComponentTwiceIsRejected)
 {
 	const auto bytes = TContainer::FileWithChunks([](lcs::save::ByteWriter& w) {
 		w.U32(1);
-		w.U32(TContainer::enemy_id);
+		w.String(TContainer::enemy_name);
 		w.U32(uint32_t(sizeof(TSave::Enemy)));
 		w.U32(2);
 		w.U32(3); w.U32(3);
@@ -636,7 +636,7 @@ TEST(Container, AComponentOnAnEntityIdThatIsNoIdIsRejected)
 {
 	const auto bytes = TContainer::FileWithChunks([](lcs::save::ByteWriter& w) {
 		w.U32(1);
-		w.U32(TContainer::enemy_id);
+		w.String(TContainer::enemy_name);
 		w.U32(uint32_t(sizeof(TSave::Enemy)));
 		w.U32(1);
 		w.U32(0xFFFFFFFFu);
@@ -661,7 +661,7 @@ TEST(Container, ParsingDoesNotJudgeWhatAComponentSays)
 {
 	const auto bytes = TContainer::FileWithChunks([](lcs::save::ByteWriter& w) {
 		w.U32(1);
-		w.U32(TContainer::enemy_id);
+		w.String(TContainer::enemy_name);
 		w.U32(uint32_t(sizeof(TSave::Enemy)));
 		w.U32(1);
 		w.U32(2);
@@ -671,5 +671,88 @@ TEST(Container, ParsingDoesNotJudgeWhatAComponentSays)
 	const auto parsed = TContainer::Parse(bytes);
 
 	ASSERT_TRUE(parsed.has_value());
-	EXPECT_FALSE(TContainer::MySchema::BytesAreValid(parsed->chunks[0].component_id, parsed->chunks[0].Component(0)));
+	EXPECT_FALSE(TContainer::MySchema::BytesAreValid(parsed->chunks[0].name, parsed->chunks[0].Component(0)));
+}
+
+/*
+ *  Chunks are named for their component
+ */
+
+TEST(Container, AChunkCarriesTheNameOfItsComponentInTheFile)
+{
+	const std::vector<std::byte> bytes = TContainer::Encode(TContainer::ASave());
+	const std::string_view name = "Position";
+
+	const auto where = std::search(bytes.begin(), bytes.end(), std::as_bytes(std::span(name)).begin(), std::as_bytes(std::span(name)).end());
+
+	EXPECT_NE(where, bytes.end());
+}
+
+/* The same name is the same component, wherever it sits in the ECS's type list. */
+TEST(Container, ComponentsAreFoundByNameAndNotByPosition)
+{
+	const auto parsed = TContainer::Parse(TContainer::Encode(TContainer::ASave()));
+	ASSERT_TRUE(parsed.has_value());
+
+	const TContainer::Chunk* enemy = lcs::save::FindChunk(*parsed, "Enemy");
+
+	ASSERT_NE(enemy, nullptr);
+	EXPECT_EQ(enemy->name, "Enemy");
+	EXPECT_EQ(lcs::save::ReadComponent<TSave::Enemy>(*enemy, 0).strength, 9);
+}
+
+/* A component renamed since the save is a component this build does not know. */
+TEST(Container, ASavedComponentWithAnotherNameIsSkippedAndNamed)
+{
+	const auto bytes = TContainer::FileWithChunks([](lcs::save::ByteWriter& w) {
+		w.U32(1);
+		w.String("enemy"); /* the case is not the same */
+		w.U32(uint32_t(sizeof(TSave::Enemy)));
+		w.U32(1);
+		w.U32(2);
+		w.Raw(TSave::Enemy{ 3 });
+	});
+
+	const auto parsed = TContainer::Parse(bytes);
+
+	ASSERT_TRUE(parsed.has_value()) << parsed.error().message;
+	EXPECT_TRUE(parsed->chunks.empty());
+	ASSERT_EQ(parsed->skipped_component_names.size(), 1u);
+	EXPECT_EQ(parsed->skipped_component_names[0], "enemy");
+}
+
+TEST(Container, AChunkWithNoNameIsRejected)
+{
+	const auto bytes = TContainer::FileWithChunks([](lcs::save::ByteWriter& w) {
+		w.U32(1);
+		w.String("");
+		w.U32(0);
+		w.U32(0);
+	});
+
+	EXPECT_EQ(TContainer::ErrorOf(bytes), lcs::save::ErrorKind::Malformed);
+}
+
+TEST(Container, AChunkNameLongerThanTheFormatAllowsIsRejected)
+{
+	const auto bytes = TContainer::FileWithChunks([](lcs::save::ByteWriter& w) {
+		w.U32(1);
+		w.String(std::string(TContainer::format.max_name_length + 1, 'a'));
+		w.U32(0);
+		w.U32(0);
+	});
+
+	EXPECT_EQ(TContainer::ErrorOf(bytes), lcs::save::ErrorKind::TooLong);
+}
+
+TEST(Container, AChunkNameThatClaimsMoreThanTheFileHoldsIsTruncated)
+{
+	const auto bytes = TContainer::FileWithChunks([](lcs::save::ByteWriter& w) {
+		w.U32(1);
+		w.U32(1000); /* a name length, and a header that fits, but no name after it */
+		w.U32(0);
+		w.U32(0);
+	});
+
+	EXPECT_EQ(TContainer::ErrorOf(bytes), lcs::save::ErrorKind::Truncated);
 }

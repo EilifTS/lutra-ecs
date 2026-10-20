@@ -6,6 +6,7 @@
 #include <cstring>
 #include <span>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -30,15 +31,17 @@
  *                   count u32 | { value u32 | name (length u32 + bytes) } * count
  *    sections     count u32 | { section_id u32 | length u32 | bytes } * count
  *    components   chunk_count u32 | chunks, each:
- *                   component_id u32 | size u32 | count u32 |
+ *                   name (length u32 + bytes) | size u32 | count u32 |
  *                   EntityID u32 * count | component bytes (size * count)
  *    trailer      CRC-32 of every byte before it
  *
- *  A name table maps a number a component holds (a handle into some library) to
+ *  A chunk is named for its component (Schema: save_name), which is its identity in
+ *  the file: no number to assign and keep. A name table maps a number a component holds (a handle into some library) to
  *  the name that number stood for, so a save survives the library being numbered
  *  differently. A section is a block of the game's own bytes, found by id; a
  *  section a build does not look for is carried along and ignored. A chunk of a
- *  component this build does not know is skipped by its length. A chunk of one it
+ *  component this build does not know (a name it has no component for) is skipped by
+ *  its length and reported by name. A chunk of one it
  *  does know, with another size, is an error: the layout changed and the bytes
  *  cannot be reinterpreted.
  */
@@ -67,7 +70,7 @@ namespace lcs::save
 	template <typename EntityID>
 	struct ComponentChunk
 	{
-		uint32_t component_id{};
+		std::string name{};               /* The component's save_name. */
 		uint32_t size{};                  /* Bytes of one component; 0 for a tag. */
 		std::vector<EntityID> entities{}; /* Which entity each component belongs to. */
 		std::vector<std::byte> bytes{};   /* size * entities.size() bytes, in the same order. */
@@ -88,9 +91,9 @@ namespace lcs::save
 		std::vector<Section> sections{};
 		std::vector<ComponentChunk<EntityID>> chunks{};
 
-		/* Only Parse fills this: the ids of chunks it skipped because this build has
+		/* Only Parse fills this: the names of chunks it skipped because this build has
 		 * no such component. The caller reports them. */
-		std::vector<uint32_t> skipped_component_ids{};
+		std::vector<std::string> skipped_component_names{};
 	};
 
 	/* The chunk for `entry`, made if there is none yet. */
@@ -99,22 +102,22 @@ namespace lcs::save
 	{
 		for (ComponentChunk<EntityID>& chunk : data.chunks)
 		{
-			if (chunk.component_id == entry.id)
+			if (chunk.name == entry.name)
 			{
 				return chunk;
 			}
 		}
 
-		data.chunks.push_back(ComponentChunk<EntityID>{ .component_id = entry.id, .size = entry.size });
+		data.chunks.push_back(ComponentChunk<EntityID>{ .name = std::string(entry.name), .size = entry.size });
 		return data.chunks.back();
 	}
 
 	template <typename EntityID>
-	[[nodiscard]] const ComponentChunk<EntityID>* FindChunk(const Container<EntityID>& data, const uint32_t component_id)
+	[[nodiscard]] const ComponentChunk<EntityID>* FindChunk(const Container<EntityID>& data, const std::string_view name)
 	{
 		for (const ComponentChunk<EntityID>& chunk : data.chunks)
 		{
-			if (chunk.component_id == component_id)
+			if (chunk.name == name)
 			{
 				return &chunk;
 			}
@@ -261,7 +264,7 @@ namespace lcs::save
 		writer.U32(uint32_t(data.chunks.size()));
 		for (const ComponentChunk<EntityID>& chunk : data.chunks)
 		{
-			writer.U32(chunk.component_id);
+			writer.String(chunk.name);
 			writer.U32(chunk.size);
 			writer.U32(uint32_t(chunk.entities.size()));
 			for (const EntityID entity : chunk.entities)
@@ -363,11 +366,11 @@ namespace lcs::save
 			return sections;
 		}
 
-		/* Reads the chunk after `component_id`, `size` and `count`. */
+		/* Reads the chunk after `name`, `size` and `count`. */
 		template <typename EntityID>
-		Result<ComponentChunk<EntityID>> ReadChunkBody(ByteReader& reader, const uint32_t component_id, const uint32_t size, const uint32_t count)
+		Result<ComponentChunk<EntityID>> ReadChunkBody(ByteReader& reader, std::string name, const uint32_t size, const uint32_t count)
 		{
-			ComponentChunk<EntityID> chunk{ .component_id = component_id, .size = size };
+			ComponentChunk<EntityID> chunk{ .name = std::move(name), .size = size };
 			chunk.entities.reserve(count);
 
 			std::unordered_set<uint32_t> seen;
@@ -453,9 +456,14 @@ namespace lcs::save
 		LCS_SAVE_TRY(chunk_count, reader.Count(chunk_header_size));
 		for (uint32_t n = 0; n < chunk_count; n++)
 		{
-			LCS_SAVE_TRY(component_id, reader.U32());
+			LCS_SAVE_TRY(name, reader.String(format.max_name_length));
 			LCS_SAVE_TRY(size, reader.U32());
 			LCS_SAVE_TRY(count, reader.U32());
+
+			if (name.empty())
+			{
+				return std::unexpected(MakeError(ErrorKind::Malformed, "a component chunk has no name"));
+			}
 
 			/* Each component takes its entity id and its bytes. */
 			const uint64_t per_component = uint64_t(sizeof(uint32_t)) + size;
@@ -467,14 +475,14 @@ namespace lcs::save
 			const SchemaEntry* entry = nullptr;
 			for (const SchemaEntry& candidate : schema)
 			{
-				if (candidate.id == component_id) { entry = &candidate; break; }
+				if (candidate.name == name) { entry = &candidate; break; }
 			}
 
 			if (entry == nullptr)
 			{
 				LCS_SAVE_TRY(skipped, reader.Bytes(size_t(count * per_component)));
 				(void)skipped;
-				data.skipped_component_ids.push_back(component_id);
+				data.skipped_component_names.push_back(name);
 				continue;
 			}
 
@@ -482,12 +490,12 @@ namespace lcs::save
 			{
 				return std::unexpected(MakeError(ErrorKind::SizeMismatch, std::string(entry->name) + " is " + std::to_string(size) + " bytes in the file, this build's is " + std::to_string(entry->size)));
 			}
-			if (FindChunk(data, component_id) != nullptr)
+			if (FindChunk(data, name) != nullptr)
 			{
 				return std::unexpected(MakeError(ErrorKind::Malformed, std::string(entry->name) + " has two chunks"));
 			}
 
-			LCS_SAVE_TRY(chunk, detail::ReadChunkBody<EntityID>(reader, component_id, size, count));
+			LCS_SAVE_TRY(chunk, detail::ReadChunkBody<EntityID>(reader, name, size, count));
 			data.chunks.push_back(chunk);
 		}
 

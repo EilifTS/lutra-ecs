@@ -17,12 +17,11 @@ namespace TSave
 {
 	using EntityID = lcs::Handle<uint32_t, 16>;
 
-	/* Nothing to say but its id. */
+	/* Nothing to say but its name. */
 	struct Position
 	{
 		static constexpr lcs::ComponentType component_type = lcs::ComponentType::Component;
 		static constexpr bool saved = true;
-		static constexpr uint32_t save_id = 1;
 		static constexpr const char* save_name = "Position";
 
 		int x, y;
@@ -33,7 +32,6 @@ namespace TSave
 	{
 		static constexpr lcs::ComponentType component_type = lcs::ComponentType::Component;
 		static constexpr bool saved = true;
-		static constexpr uint32_t save_id = 2;
 		static constexpr const char* save_name = "Enemy";
 
 		int strength;
@@ -51,7 +49,6 @@ namespace TSave
 	{
 		static constexpr lcs::ComponentType component_type = lcs::ComponentType::Component;
 		static constexpr bool saved = true;
-		static constexpr uint32_t save_id = 3;
 		static constexpr const char* save_name = "Follower";
 
 		EntityID target;
@@ -64,7 +61,6 @@ namespace TSave
 	{
 		static constexpr lcs::ComponentType component_type = lcs::ComponentType::Component;
 		static constexpr bool saved = true;
-		static constexpr uint32_t save_id = 4;
 		static constexpr const char* save_name = "Leash";
 
 		EntityID anchor;
@@ -77,7 +73,6 @@ namespace TSave
 	{
 		static constexpr lcs::ComponentType component_type = lcs::ComponentType::Tag;
 		static constexpr bool saved = true;
-		static constexpr uint32_t save_id = 100;
 		static constexpr const char* save_name = "Wet";
 	};
 

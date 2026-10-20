@@ -96,7 +96,7 @@ namespace lcs::save
 			{
 				if (failure) return;
 
-				const ComponentChunk<EntityID>* chunk = FindChunk(data, SaveIdOf<T>());
+				const ComponentChunk<EntityID>* chunk = FindChunk(data, SaveNameOf<T>());
 				if (chunk == nullptr) return;
 
 				for (size_t i = 0; i < chunk->Count() && !failure; i++)
@@ -182,15 +182,15 @@ namespace lcs::save
 
 	/* A component of an entity the save does not list is an error, as is anything
 	 * the component or the policy fail. A chunk of a component this build does not know
-	 * (see Container::skipped_component_ids) is reported and skipped. */
+	 * (see Container::skipped_component_names) is reported and skipped. */
 	template <typename Schema, typename Policy>
 	[[nodiscard]] Result<Decoded<Schema>> Decode(const Container<typename Schema::EcsType::EntityID>& data, Policy& policy, const Reporter& reporter)
 	{
 		using EntityID = typename Schema::EcsType::EntityID;
 
-		for (const uint32_t id : data.skipped_component_ids)
+		for (const std::string& name : data.skipped_component_names)
 		{
-			Report(reporter, Severity::Warning, "save", "a component with id " + std::to_string(id) + " is not one this build knows, skipped");
+			Report(reporter, Severity::Warning, "save", "a component named '" + name + "' is not one this build knows, skipped");
 		}
 
 		Decoded<Schema> out;

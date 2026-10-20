@@ -1,6 +1,7 @@
 add_executable(tests
     tests.cpp
     TBitMask.h
+    TDeferred.h
     TECS.h
     THandle.h
     THandleFreeList.h

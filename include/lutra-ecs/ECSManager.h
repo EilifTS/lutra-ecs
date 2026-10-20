@@ -6,8 +6,10 @@
 #include <lutra-ecs/Views.h>
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <span>
 #include <type_traits>
+#include <utility>
 #include <vector>
 #include <tuple>
 
@@ -53,15 +55,49 @@ namespace lcs
 		template <typename T> inline TagView<EntityID, T> TView();
 		/* template <typename T> inline u32 GetTagCount(); */
 
+		/* Deferred adds
+		 *
+		 * AddDeferred() takes the component or tag now and puts it on the entity at
+		 * the next FlushDeferred(), which belongs at one known point of the frame and
+		 * never inside a view iteration: adding a component while a view over the
+		 * same type is being walked would invalidate it. That lets an entity be made
+		 * and described anywhere (a parser, a loader) with the ids already in hand --
+		 * stored in another component, say -- while the storage stays untouched.
+		 *
+		 * Between CreateEntity() and the flush the entity is valid and bare: every
+		 * HasComponent() is false. Don't read through it.
+		 *
+		 * Any component or tag of the ECS can be deferred, at most one of a type per
+		 * entity. Flush adds them type by type in the order the ECS lists its types;
+		 * an entity's components are independent of each other, so the order matters
+		 * to nothing. Destroying an entity does not drop what is deferred for it.
+		 *
+		 *     ecs.AddDeferred(entity, Position{ .x = 1 });
+		 *     ecs.AddDeferred<IsPlayer>(entity);
+		 *     ecs.FlushDeferred();  // the entity has a Position and the IsPlayer tag */
+		template <typename T> inline void AddDeferred(EntityID id, T value = {});
+		inline void FlushDeferred();
+
+		/* True when anything is deferred, in any type. Creating an entity defers nothing. */
+		[[nodiscard]] inline bool HasDeferred() const;
+
+		/* Drops everything deferred. Clear() does it too: clearing resets the entity
+		 * handle free list, so a deferred id would collide with a freshly issued one. */
+		inline void ClearDeferred();
+
 		inline void Clear();
 
 	private:
 		inline void reserveComponentStorage(EntityID::data_t new_size);
 		inline void growComponentStorageIfNecessary();
 
+		template <typename T>
+		using DeferredEntries = std::vector<std::pair<EntityID, T>>;
+
 	private:
 		HandleFreeList<EntityID> entity_id_generator{};
 		std::tuple<typename internal_ecs::GetComponentContainer<EntityID, Ts, Ts::component_type>::Container... > component_sets{};
+		std::tuple<DeferredEntries<Ts>...> deferred{};
 		EntityID::data_t reserved_component_count{ 8 };
 		static constexpr uint32_t component_grow_factor = 2;
 	};
@@ -77,6 +113,7 @@ namespace lcs
 	inline void ECSManager<EntityID, Ts...>::CreateEntitiesFromIDs(std::span<const EntityID> ids)
 	{
 		assert(entity_id_generator.MaxIndex() == 0 && "CreateEntitiesFromIDs needs an ECS with no entities ever created since Clear()");
+		assert(!HasDeferred() && "CreateEntitiesFromIDs needs nothing deferred");
 
 		entity_id_generator.Restore(ids);
 
@@ -217,10 +254,46 @@ namespace lcs
 		return set.Size();
 	}*/
 
+	template <typename EntityID, typename... Ts> template <typename T>
+	inline void ECSManager<EntityID, Ts...>::AddDeferred(EntityID id, T value)
+	{
+		static_assert((std::is_same_v<T, Ts> || ...), "this type is not one of the ECS's components or tags");
+
+		std::get<DeferredEntries<T>>(deferred).emplace_back(id, std::move(value));
+	}
+
+	template <typename EntityID, typename... Ts>
+	inline void ECSManager<EntityID, Ts...>::FlushDeferred()
+	{
+		([&]
+		{
+			auto& entries = std::get<DeferredEntries<Ts>>(deferred);
+			for (auto& [id, value] : entries)
+			{
+				if constexpr (Ts::component_type == ComponentType::Tag)  AddTag<Ts>(id);
+				else                                                     AddComponent<Ts>(id, std::move(value));
+			}
+			entries.clear();
+		}(), ...);
+	}
+
+	template <typename EntityID, typename... Ts>
+	inline bool ECSManager<EntityID, Ts...>::HasDeferred() const
+	{
+		return (!std::get<DeferredEntries<Ts>>(deferred).empty() || ...);
+	}
+
+	template <typename EntityID, typename... Ts>
+	inline void ECSManager<EntityID, Ts...>::ClearDeferred()
+	{
+		(std::get<DeferredEntries<Ts>>(deferred).clear(), ...);
+	}
+
 	template <typename EntityID, typename... Ts>
 	void ECSManager<EntityID, Ts...>::Clear()
 	{
 		(std::get<typename internal_ecs::GetComponentContainer<EntityID, Ts, Ts::component_type>::Container>(component_sets).Clear(), ...);
+		ClearDeferred();
 		entity_id_generator.Clear();
 
 		reserved_component_count = 8;

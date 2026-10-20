@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "TBitMask.h"
+#include "TDeferred.h"
 #include "TECS.h"
 #include "THandle.h"
 #include "THandleFreeList.h"

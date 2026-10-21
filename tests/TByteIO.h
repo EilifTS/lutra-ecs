@@ -46,14 +46,14 @@ namespace TByteIO
 	{
 		ByteWriter writer;
 		writer.U32(7);
-		writer.U64(0x1122334455667788ull);
+		writer.Raw(uint64_t(0x1122334455667788ull));
 		writer.String("tree");
 		writer.String("");
 		writer.Raw(Mixed{ 1.5f, 9, { 1, 2, 3, 4 } });
 
 		ByteReader reader(writer.View());
 		EXPECT_EQ(*reader.U32(), 7u);
-		EXPECT_EQ(*reader.U64(), 0x1122334455667788ull);
+		EXPECT_EQ(*reader.Raw<uint64_t>(), 0x1122334455667788ull);
 		EXPECT_EQ(*reader.String(100), "tree");
 		EXPECT_EQ(*reader.String(100), "");
 		const auto mixed = reader.Raw<Mixed>();
@@ -81,7 +81,7 @@ namespace TByteIO
 	{
 		ByteWriter writer;
 		writer.U32(1);
-		writer.U64(2);
+		writer.Raw(uint64_t(2));
 
 		for (size_t length = 0; length < 4; length++)
 		{
@@ -93,7 +93,7 @@ namespace TByteIO
 
 		ByteReader reader(writer.View().first(8));
 		EXPECT_TRUE(reader.U32().has_value());
-		EXPECT_FALSE(reader.U64().has_value());
+		EXPECT_FALSE(reader.Raw<uint64_t>().has_value());
 	}
 
 	TEST(ByteIO, AFailedReadConsumesNothing)

@@ -126,11 +126,4 @@ namespace lcs::save
 			}
 		});
 	}
-
-	/* Restore, deferring every component as it is. */
-	template <typename Schema>
-	void Restore(typename Schema::EcsType& ecs, const Decoded<Schema>& decoded)
-	{
-		Restore(ecs, decoded, [&ecs](const auto entity, const auto& component) { ecs.AddDeferred(entity, component); });
-	}
 }

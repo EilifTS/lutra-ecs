@@ -81,6 +81,12 @@ namespace TRoundTrip
 		return decoded.has_value() ? std::move(*decoded) : Decoded{};
 	}
 
+	/* Restore, deferring every component as it is. */
+	inline void RestoreAsIs(ECS& ecs, const Decoded& decoded)
+	{
+		lcs::save::Restore(ecs, decoded, [&ecs](const EntityID entity, const auto& component) { ecs.AddDeferred(entity, component); });
+	}
+
 	/* A small world with a bit of everything. Entity 1 is gone, so ids are not dense. */
 	struct World
 	{
@@ -250,7 +256,7 @@ TEST(Restore, PutsEveryEntityBackUnderItsOwnId)
 	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(captured, log);
 	TSave::ECS target;
 
-	lcs::save::Restore(target, decoded);
+	TRoundTrip::RestoreAsIs(target, decoded);
 	target.FlushDeferred();
 
 	ASSERT_TRUE(TRoundTrip::EntitiesOf(target) == TRoundTrip::EntitiesOf(world.ecs));
@@ -270,7 +276,7 @@ TEST(Restore, DefersTheComponentsAndFlushesNothing)
 	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(lcs::save::Capture<TSave::MySchema>(world.ecs), log);
 	TSave::ECS target;
 
-	lcs::save::Restore(target, decoded);
+	TRoundTrip::RestoreAsIs(target, decoded);
 
 	ASSERT_TRUE(target.HasDeferred());
 	ASSERT_TRUE(!target.HasComponent<TSave::Position>(world.a));
@@ -288,7 +294,7 @@ TEST(Restore, AnIdThatHasBeenReusedKeepsItsValidationBits)
 	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(lcs::save::Capture<TSave::MySchema>(source), log);
 	TSave::ECS target;
 
-	lcs::save::Restore(target, decoded);
+	TRoundTrip::RestoreAsIs(target, decoded);
 	target.FlushDeferred();
 
 	ASSERT_TRUE(target.HasComponent<TSave::Position>(reused));
@@ -345,11 +351,11 @@ TEST(Restore, WorksAgainOnceTheECSIsCleared)
 	TRoundTrip::Log log;
 	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(lcs::save::Capture<TSave::MySchema>(world.ecs), log);
 	TSave::ECS target;
-	lcs::save::Restore(target, decoded);
+	TRoundTrip::RestoreAsIs(target, decoded);
 	target.FlushDeferred();
 
 	target.Clear();
-	lcs::save::Restore(target, decoded);
+	TRoundTrip::RestoreAsIs(target, decoded);
 	target.FlushDeferred();
 
 	ASSERT_TRUE(TRoundTrip::EntitiesOf(target) == TRoundTrip::EntitiesOf(world.ecs));
@@ -368,7 +374,7 @@ TEST(RoundTrip, AWorldThroughTheBytesOfAFileComesBackTheSame)
 	ASSERT_TRUE(parsed.has_value()) << parsed.error().message;
 	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(*parsed, log);
 	TSave::ECS target;
-	lcs::save::Restore(target, decoded);
+	TRoundTrip::RestoreAsIs(target, decoded);
 	target.FlushDeferred();
 
 	ASSERT_TRUE(TRoundTrip::EntitiesOf(target) == TRoundTrip::EntitiesOf(world.ecs));
@@ -435,7 +441,7 @@ TEST(EntityIds, AReferenceToADestroyedEntityComesBackAsTheSameDeadId)
 	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(captured, log);
 	TSave::ECS target;
 
-	lcs::save::Restore(target, decoded);
+	TRoundTrip::RestoreAsIs(target, decoded);
 	target.FlushDeferred();
 
 	ASSERT_TRUE(log.lines.empty());
@@ -452,7 +458,7 @@ TEST(EntityIds, AReferenceToALiveEntityNamesItAgainAfterTheLoad)
 	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(lcs::save::Capture<TSave::MySchema>(world.ecs), log);
 	TSave::ECS target;
 
-	lcs::save::Restore(target, decoded);
+	TRoundTrip::RestoreAsIs(target, decoded);
 	target.FlushDeferred();
 
 	const TSave::EntityID followed = target.GetComponent<TSave::Follower>(world.b).target;
@@ -475,7 +481,7 @@ TEST(EntityIds, AReferenceToAReusedIndexDoesNotNameTheNewEntityAfterTheLoad)
 	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(lcs::save::Capture<TSave::MySchema>(source), log);
 	TSave::ECS target;
 
-	lcs::save::Restore(target, decoded);
+	TRoundTrip::RestoreAsIs(target, decoded);
 	target.FlushDeferred();
 
 	ASSERT_TRUE(target.IsAlive(replacement));

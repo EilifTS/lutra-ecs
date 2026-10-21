@@ -34,12 +34,12 @@ TEST(Schema, HasOneEntryPerSavedTypeInListOrder)
 	ASSERT_TRUE(entries[4].name == "Wet");
 }
 
-TEST(Schema, EntriesSayHowBigAComponentIsAndWhetherItIsATag)
+TEST(Schema, EntriesSayHowBigAComponentIs)
 {
 	const auto& entries = TSchema::MySchema::entries;
 
-	ASSERT_TRUE(entries[0].size == sizeof(TSave::Position) && !entries[0].is_tag);
-	ASSERT_TRUE(entries[4].size == 0 && entries[4].is_tag);
+	ASSERT_TRUE(entries[0].size == sizeof(TSave::Position));
+	ASSERT_TRUE(entries[4].size == 0); /* a tag has no bytes */
 }
 
 TEST(Schema, ForEachSavedVisitsEverySavedTypeInOrder)
@@ -112,7 +112,7 @@ namespace TSchema
 
 	static_assert(lcs::save::NamesAreUnique(MySchema::entries));
 	static_assert(lcs::save::NamesAreUnique(std::array<lcs::save::SchemaEntry, 0>{}));
-	static_assert(!lcs::save::NamesAreUnique(std::array<lcs::save::SchemaEntry, 2>{ lcs::save::SchemaEntry{ "a", 4, false }, lcs::save::SchemaEntry{ "a", 8, false } }),
+	static_assert(!lcs::save::NamesAreUnique(std::array<lcs::save::SchemaEntry, 2>{ lcs::save::SchemaEntry{ "a", 4 }, lcs::save::SchemaEntry{ "a", 8 } }),
 		"a repeated name is caught");
 
 	static_assert(lcs::IsOneOf<int>(lcs::TypeList<char, int>{}));

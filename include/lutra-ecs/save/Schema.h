@@ -73,7 +73,6 @@ namespace lcs::save
 	{
 		std::string_view name;
 		uint32_t size; /* Bytes of one component; 0 for a tag. */
-		bool is_tag;
 	};
 
 	constexpr bool NamesAreUnique(const std::span<const SchemaEntry> entries)
@@ -110,8 +109,7 @@ namespace lcs::save
 			static_assert(std::is_trivially_copyable_v<T>, "a saved component is written as its bytes");
 			static_assert(HasSaveName<T>, "a saved component needs `static constexpr const char* save_name`, which is what a file calls it and is never changed");
 
-			constexpr bool is_tag = T::component_type == ComponentType::Tag;
-			return SchemaEntry{ SaveNameOf<T>(), is_tag ? 0u : uint32_t(sizeof(T)), is_tag };
+			return SchemaEntry{ SaveNameOf<T>(), T::component_type == ComponentType::Tag ? 0u : uint32_t(sizeof(T)) };
 		}
 
 		template <typename... Ts>

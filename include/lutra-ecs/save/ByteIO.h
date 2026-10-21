@@ -26,7 +26,6 @@ namespace lcs::save
 	{
 	public:
 		void U32(const uint32_t value) { Raw(value); }
-		void U64(const uint64_t value) { Raw(value); }
 
 		/* Length-prefixed, no terminator. */
 		void String(const std::string_view text)
@@ -73,7 +72,6 @@ namespace lcs::save
 		[[nodiscard]] bool AtEnd() const { return position == data.size(); }
 
 		[[nodiscard]] Result<uint32_t> U32() { return Raw<uint32_t>(); }
-		[[nodiscard]] Result<uint64_t> U64() { return Raw<uint64_t>(); }
 
 		/* A view into the buffer, which must outlive it. */
 		[[nodiscard]] Result<std::span<const std::byte>> Bytes(const size_t count)

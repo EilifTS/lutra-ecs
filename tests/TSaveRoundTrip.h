@@ -28,7 +28,7 @@ namespace TRoundTrip
 	using Data = lcs::save::Container<EntityID>;
 	using Decoded = lcs::save::Decoded<MySchema>;
 
-	constexpr lcs::save::Format format{ .magic = 0x54455354u, .version = 1, .name_table_count = 0, .max_name_length = 64 };
+	constexpr lcs::save::Format format{ .magic = 0x54455354u, .version = 1, .max_name_length = 64 };
 
 	/* What was reported, in order. */
 	struct Log

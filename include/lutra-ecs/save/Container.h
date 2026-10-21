@@ -1,13 +1,10 @@
 #pragma once
-#include <algorithm>
-#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <span>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -19,16 +16,13 @@
 
 /**
  *  A save as data, and the bytes it goes to and comes from. The container holds
- *  what every save of an ECS has -- the entities, the components of each saved
- *  type, tables of names -- and room for whatever else a game has to put beside
- *  them. Nothing here knows about a particular game.
+ *  what every save of an ECS has -- the entities and the components of each saved
+ *  type -- and room for whatever else a game has to put beside them. Nothing here knows about a particular game.
  *
  *  Layout, all little-endian:
  *
  *    header       magic u32 | format_version u32        (both the game's: see Format)
  *    entities     count u32 | EntityID u32 * count       (strictly ascending by index)
- *    names        table_count u32 | for each table:
- *                   count u32 | { value u32 | name (length u32 + bytes) } * count
  *    sections     count u32 | { section_id u32 | length u32 | bytes } * count
  *    components   chunk_count u32 | chunks, each:
  *                   name (length u32 + bytes) | size u32 | count u32 |
@@ -36,11 +30,9 @@
  *    trailer      CRC-32 of every byte before it
  *
  *  A chunk is named for its component (Schema: save_name), which is its identity in
- *  the file: no number to assign and keep. A name table maps a number a component
- *  holds (a handle into some library) to the name that number stood for, so a save
- *  survives the library being numbered differently. A section is a block of the
- *  game's own bytes, found by id; a section a build does not look for is carried
- *  along and ignored. A chunk of a component this build does not know (a name it
+ *  the file: no number to assign and keep. A section is a block of the game's own
+ *  bytes, found by id; a section a build does not look for is carried along and
+ *  ignored. A chunk of a component this build does not know (a name it
  *  has no component for) is skipped by its length and reported by name. A chunk of
  *  one it does know, with another size, is an error: the layout changed and the
  *  bytes cannot be reinterpreted.
@@ -61,12 +53,8 @@ namespace lcs::save
 	{
 		uint32_t magic{};
 		uint32_t version{};       /* Written; a file of another version is refused. */
-		size_t name_table_count{ 0 };
-		size_t max_name_length{ 1024 };
+		size_t max_name_length{ 1024 }; /* Of a component's name in a chunk. */
 	};
-
-	/* handle value -> name */
-	using NameTable = std::unordered_map<uint32_t, std::string>;
 
 	/* A block of the game's own bytes. */
 	struct Section
@@ -96,7 +84,6 @@ namespace lcs::save
 	struct Container
 	{
 		std::vector<EntityID> entities{};
-		std::vector<NameTable> names{};      /* Format::name_table_count of them. */
 		std::vector<Section> sections{};
 		std::vector<ComponentChunk<EntityID>> chunks{};
 
@@ -231,7 +218,6 @@ namespace lcs::save
 	[[nodiscard]] std::vector<std::byte> Encode(const Container<EntityID>& data, const Format& format)
 	{
 		static_assert(sizeof(EntityID::handle) == sizeof(uint32_t), "entity ids are written as 32 bits");
-		assert(data.names.size() == format.name_table_count && "the container has another number of name tables than the format says");
 
 		ByteWriter writer;
 		writer.U32(format.magic);
@@ -241,25 +227,6 @@ namespace lcs::save
 		for (const EntityID entity : data.entities)
 		{
 			writer.U32(entity.handle);
-		}
-
-		writer.U32(uint32_t(data.names.size()));
-		for (const NameTable& table : data.names)
-		{
-			/* By handle value, so the same save is written the same way every time. */
-			std::vector<std::pair<uint32_t, const std::string*>> entries;
-			for (const auto& [value, name] : table)
-			{
-				entries.emplace_back(value, &name);
-			}
-			std::ranges::sort(entries, {}, &std::pair<uint32_t, const std::string*>::first);
-
-			writer.U32(uint32_t(entries.size()));
-			for (const auto& [value, name] : entries)
-			{
-				writer.U32(value);
-				writer.String(*name);
-			}
 		}
 
 		writer.U32(uint32_t(data.sections.size()));
@@ -329,28 +296,6 @@ namespace lcs::save
 				entities.push_back(entity);
 			}
 			return entities;
-		}
-
-		inline Result<NameTable> ReadNameTable(ByteReader& reader, const size_t table, const size_t max_name_length)
-		{
-			LCS_SAVE_TRY(count, reader.Count(2 * sizeof(uint32_t)));
-
-			NameTable names;
-			for (uint32_t n = 0; n < count; n++)
-			{
-				LCS_SAVE_TRY(value, reader.U32());
-				LCS_SAVE_TRY(name, reader.String(max_name_length));
-
-				if (name.empty())
-				{
-					return std::unexpected(MakeError(ErrorKind::Malformed, "name table " + std::to_string(table) + " has an empty name"));
-				}
-				if (!names.emplace(value, name).second)
-				{
-					return std::unexpected(MakeError(ErrorKind::Malformed, "name table " + std::to_string(table) + " names the same handle twice"));
-				}
-			}
-			return names;
 		}
 
 		inline Result<std::vector<Section>> ReadSections(ByteReader& reader)
@@ -446,17 +391,6 @@ namespace lcs::save
 
 		LCS_SAVE_TRY(entities, detail::ReadEntities<EntityID>(reader));
 		data.entities = entities;
-
-		LCS_SAVE_TRY(table_count, reader.Count(sizeof(uint32_t)));
-		if (table_count != format.name_table_count)
-		{
-			return std::unexpected(MakeError(ErrorKind::SizeMismatch, "the save has " + std::to_string(table_count) + " name tables, this build's has " + std::to_string(format.name_table_count)));
-		}
-		for (size_t table = 0; table < format.name_table_count; table++)
-		{
-			LCS_SAVE_TRY(names, detail::ReadNameTable(reader, table, format.max_name_length));
-			data.names.push_back(names);
-		}
 
 		LCS_SAVE_TRY(sections, detail::ReadSections(reader));
 		data.sections = sections;

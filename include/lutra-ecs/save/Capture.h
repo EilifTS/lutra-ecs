@@ -12,7 +12,7 @@
  *  and none of the Schema's transient types present. A debug build asserts both.
  *  Capture reads; it changes nothing.
  *
- *  The game's own parts of a save -- name tables, sections, and anything it needs
+ *  The game's own parts of a save -- sections, and anything it needs
  *  to look at in the components, such as the handles in them -- are the caller's to
  *  work out from, and put into, the Container afterwards.
  */

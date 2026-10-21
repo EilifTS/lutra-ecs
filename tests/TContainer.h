@@ -33,9 +33,8 @@ namespace TContainer
 	constexpr const char* position_name = "Position";
 	constexpr const char* enemy_name = "Enemy";
 	constexpr const char* wet_name = "Wet";
-	constexpr size_t name_tables = 3;
 
-	constexpr lcs::save::Format format{ .magic = 0x5354554Cu, .version = 3, .name_table_count = name_tables, .max_name_length = 1024 };
+	constexpr lcs::save::Format format{ .magic = 0x5354554Cu, .version = 3, .max_name_length = 1024 };
 
 	/* Something a game keeps beside its components: fixed size, an id of its own. */
 	struct Body
@@ -48,10 +47,6 @@ namespace TContainer
 	{
 		Data data;
 		data.entities = { EntityID::CreateNew(0), EntityID::CreateNew(2), EntityID::CreateNew(5) };
-		data.names.resize(name_tables);
-		data.names[0].emplace(3, "TreeSpriteSheet");
-		data.names[0].emplace(0, "GreenPixelSpriteSheet");
-		data.names[2].emplace(1, "Human2Idle");
 
 		const Body bodies[] = { { 7, 1.5f }, { 9, 2.5f } };
 		data.sections.push_back(lcs::save::MakeRecordSection<Body>(40, bodies));
@@ -65,14 +60,6 @@ namespace TContainer
 		return data;
 	}
 
-	/* The empty save that has the right number of name tables. */
-	Data AnEmptySave()
-	{
-		Data data;
-		data.names.resize(name_tables);
-		return data;
-	}
-
 	std::vector<std::byte> Seal(ByteWriter& writer)
 	{
 		writer.U32(lcs::save::Crc32(writer.View()));
@@ -82,7 +69,6 @@ namespace TContainer
 	/* The start of a valid file. The pieces a case wants to forge are written by
 	 * hand after or instead of these. */
 	void Header(ByteWriter& w) { w.U32(format.magic); w.U32(format.version); }
-	void NoTables(ByteWriter& w) { w.U32(uint32_t(name_tables)); for (size_t i = 0; i < name_tables; i++) w.U32(0); }
 	void NoSections(ByteWriter& w) { w.U32(0); }
 
 	/* A valid file around the `chunks` the case writes. */
@@ -91,7 +77,6 @@ namespace TContainer
 		ByteWriter w;
 		Header(w);
 		w.U32(0);
-		NoTables(w);
 		NoSections(w);
 		write_chunks(w);
 		return Seal(w);
@@ -127,7 +112,6 @@ TEST(Container, ASaveComesBackAsItWasWritten)
 
 	ASSERT_TRUE(parsed.has_value()) << parsed.error().message;
 	EXPECT_EQ(parsed->entities, saved.entities);
-	EXPECT_EQ(parsed->names, saved.names);
 	ASSERT_EQ(parsed->sections.size(), saved.sections.size());
 	for (size_t i = 0; i < saved.sections.size(); i++)
 	{
@@ -166,13 +150,12 @@ TEST(Container, TheComponentsInAChunkAreReadBackByTypeAndIndex)
 
 TEST(Container, AnEmptySaveIsASave)
 {
-	const auto parsed = TContainer::Parse(TContainer::Encode(TContainer::AnEmptySave()));
+	const auto parsed = TContainer::Parse(TContainer::Encode(TContainer::Data{}));
 
 	ASSERT_TRUE(parsed.has_value()) << parsed.error().message;
 	EXPECT_TRUE(parsed->entities.empty());
 	EXPECT_TRUE(parsed->chunks.empty());
 	EXPECT_TRUE(parsed->sections.empty());
-	EXPECT_EQ(parsed->names.size(), TContainer::name_tables);
 }
 
 TEST(Container, TheFileStartsWithItsMagicAndVersion)
@@ -186,23 +169,9 @@ TEST(Container, TheFileStartsWithItsMagicAndVersion)
 	EXPECT_EQ(uint8_t(bytes[4]), TContainer::format.version);
 }
 
-/* Names are unordered in memory; the file must not depend on how they got there. */
-TEST(Container, TheSameSaveIsAlwaysWrittenTheSameWay)
+TEST(Container, ASaveWithNoSectionsRoundTrips)
 {
-	TContainer::Data ascending = TContainer::ASave();
-	TContainer::Data descending = TContainer::ASave();
-	for (uint32_t i = 0; i < 60; i++)
-	{
-		ascending.names[1].emplace(i, "name" + std::to_string(i));
-		descending.names[1].emplace(59 - i, "name" + std::to_string(59 - i));
-	}
-
-	EXPECT_EQ(TContainer::Encode(ascending), TContainer::Encode(descending));
-}
-
-TEST(Container, ASaveWithNoSectionsAndNoNamesRoundTrips)
-{
-	TContainer::Data data = TContainer::AnEmptySave();
+	TContainer::Data data;
 	data.entities = { TSave::EntityID::CreateNew(1) };
 	lcs::save::AddComponent<TContainer::MySchema>(data, data.entities[0], TSave::Enemy{ 2 });
 
@@ -304,7 +273,6 @@ TEST(Container, ASectionThatIsInTheFileTwiceIsRejected)
 	lcs::save::ByteWriter w;
 	TContainer::Header(w);
 	w.U32(0);
-	TContainer::NoTables(w);
 	w.U32(2);
 	for (int i = 0; i < 2; i++)
 	{
@@ -321,7 +289,6 @@ TEST(Container, ASectionLongerThanTheFileIsRejected)
 	lcs::save::ByteWriter w;
 	TContainer::Header(w);
 	w.U32(0);
-	TContainer::NoTables(w);
 	w.U32(1);
 	w.U32(40);
 	w.U32(1000);
@@ -335,7 +302,6 @@ TEST(Container, ACountOfFourBillionSectionsIsRejected)
 	lcs::save::ByteWriter w;
 	TContainer::Header(w);
 	w.U32(0);
-	TContainer::NoTables(w);
 	w.U32(0xFFFFFFFFu);
 
 	EXPECT_EQ(TContainer::ErrorOf(TContainer::Seal(w)), lcs::save::ErrorKind::BadCount);
@@ -418,30 +384,6 @@ TEST(Container, ACountOfFourBillionEntitiesIsRejected)
 	EXPECT_EQ(TContainer::ErrorOf(TContainer::Seal(w)), lcs::save::ErrorKind::BadCount);
 }
 
-TEST(Container, ACountOfFourBillionNamesIsRejected)
-{
-	lcs::save::ByteWriter w;
-	TContainer::Header(w);
-	w.U32(0);
-	w.U32(uint32_t(TContainer::name_tables));
-	w.U32(0xFFFFFFFFu);
-
-	EXPECT_EQ(TContainer::ErrorOf(TContainer::Seal(w)), lcs::save::ErrorKind::BadCount);
-}
-
-TEST(Container, AnotherNumberOfNameTablesIsRejected)
-{
-	lcs::save::ByteWriter w;
-	TContainer::Header(w);
-	w.U32(0);
-	w.U32(uint32_t(TContainer::name_tables + 1));
-	for (size_t i = 0; i < TContainer::name_tables + 1; i++) w.U32(0);
-	TContainer::NoSections(w);
-	w.U32(0);
-
-	EXPECT_EQ(TContainer::ErrorOf(TContainer::Seal(w)), lcs::save::ErrorKind::SizeMismatch);
-}
-
 TEST(Container, ACountOfFourBillionChunksIsRejected)
 {
 	EXPECT_EQ(TContainer::ErrorOf(TContainer::FileWithChunks([](lcs::save::ByteWriter& w) { w.U32(0xFFFFFFFFu); })), lcs::save::ErrorKind::BadCount);
@@ -470,47 +412,6 @@ TEST(Container, AChunkWhoseSizeTimesCountWrapsIsRejected)
 	});
 
 	EXPECT_EQ(TContainer::ErrorOf(bytes), lcs::save::ErrorKind::BadCount);
-}
-
-TEST(Container, ANameLongerThanTheFormatAllowsIsRejected)
-{
-	lcs::save::ByteWriter w;
-	TContainer::Header(w);
-	w.U32(0);
-	w.U32(uint32_t(TContainer::name_tables));
-	w.U32(1);
-	w.U32(5);
-	w.U32(uint32_t(TContainer::format.max_name_length + 1));
-	const std::string name(TContainer::format.max_name_length + 1, 'a');
-	w.Bytes(std::as_bytes(std::span(name)));
-
-	EXPECT_EQ(TContainer::ErrorOf(TContainer::Seal(w)), lcs::save::ErrorKind::TooLong);
-}
-
-TEST(Container, AnEmptyNameIsRejected)
-{
-	lcs::save::ByteWriter w;
-	TContainer::Header(w);
-	w.U32(0);
-	w.U32(uint32_t(TContainer::name_tables));
-	w.U32(1);
-	w.U32(5);
-	w.String("");
-
-	EXPECT_EQ(TContainer::ErrorOf(TContainer::Seal(w)), lcs::save::ErrorKind::Malformed);
-}
-
-TEST(Container, ATwiceNamedHandleIsRejected)
-{
-	lcs::save::ByteWriter w;
-	TContainer::Header(w);
-	w.U32(0);
-	w.U32(uint32_t(TContainer::name_tables));
-	w.U32(2);
-	w.U32(5); w.String("a");
-	w.U32(5); w.String("b");
-
-	EXPECT_EQ(TContainer::ErrorOf(TContainer::Seal(w)), lcs::save::ErrorKind::Malformed);
 }
 
 TEST(Container, EntitiesOutOfOrderOrRepeatedAreRejected)

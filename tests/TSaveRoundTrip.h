@@ -21,7 +21,6 @@ namespace TRoundTrip
 {
 	using lcs::save::ErrorKind;
 	using lcs::save::Severity;
-	using lcs::save::Verdict;
 	using TSave::ECS;
 	using TSave::EntityID;
 	using TSave::MySchema;
@@ -55,47 +54,6 @@ namespace TRoundTrip
 			return std::ranges::any_of(lines, [&](const Line& line) {
 				return line.severity == severity && line.subject == subject && line.message.find(message_part) != std::string::npos;
 			});
-		}
-	};
-
-	/* Remembers what it was asked about, and refuses what it is told to. */
-	struct RecordingPolicy
-	{
-		int accepted_calls{ 0 };
-		int component_calls{ 0 };
-		bool refuse_enemies_over{ false };
-		int refuse_strength_over{ 0 };
-		bool fail_on_follower{ false };
-		int add_to_position_x{ 0 };
-
-		template <typename T>
-		Verdict Accept(const EntityID, T& copy)
-		{
-			accepted_calls++;
-			if constexpr (std::is_same_v<T, TSave::Enemy>)
-			{
-				if (refuse_enemies_over && copy.strength > refuse_strength_over) return Verdict::Drop("too strong to keep");
-			}
-			return Verdict::Keep();
-		}
-
-		template <typename T>
-		Verdict Component(const EntityID, T& component)
-		{
-			component_calls++;
-			if constexpr (std::is_same_v<T, TSave::Enemy>)
-			{
-				if (refuse_enemies_over && component.strength > refuse_strength_over) return Verdict::Drop("too strong to load");
-			}
-			if constexpr (std::is_same_v<T, TSave::Follower>)
-			{
-				if (fail_on_follower) return Verdict::Fail("it follows nobody the game knows");
-			}
-			if constexpr (std::is_same_v<T, TSave::Position>)
-			{
-				component.x += add_to_position_x;
-			}
-			return Verdict::Keep();
 		}
 	};
 
@@ -154,30 +112,26 @@ namespace TRoundTrip
 TEST(Capture, ListsTheEntitiesThatExist)
 {
 	TRoundTrip::World world;
-	TRoundTrip::Log log;
 
-	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter());
+	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs);
 
-	ASSERT_TRUE((captured.data.entities == std::vector<TSave::EntityID>{ world.a, world.b, world.c }));
-	ASSERT_TRUE(captured.dropped_components == 0);
-	ASSERT_TRUE(log.lines.empty());
+	ASSERT_TRUE((captured.entities == std::vector<TSave::EntityID>{ world.a, world.b, world.c }));
 }
 
 TEST(Capture, WritesEachComponentOfEachSavedTypeUnderItsEntity)
 {
 	TRoundTrip::World world;
-	TRoundTrip::Log log;
 
-	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter());
+	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs);
 
-	const auto* positions = lcs::save::FindChunk(captured.data, "Position");
+	const auto* positions = lcs::save::FindChunk(captured, "Position");
 	ASSERT_TRUE(positions != nullptr && positions->Count() == 2);
 	ASSERT_TRUE(lcs::save::ReadComponent<TSave::Position>(*positions, 0).y == 2 || lcs::save::ReadComponent<TSave::Position>(*positions, 1).y == 2);
 
-	const auto* wet = lcs::save::FindChunk(captured.data, "Wet");
+	const auto* wet = lcs::save::FindChunk(captured, "Wet");
 	ASSERT_TRUE(wet != nullptr && wet->Count() == 1 && wet->entities[0] == world.a);
 
-	const auto* leash = lcs::save::FindChunk(captured.data, "Leash");
+	const auto* leash = lcs::save::FindChunk(captured, "Leash");
 	ASSERT_TRUE(leash != nullptr && leash->entities[0] == world.c);
 	ASSERT_TRUE(lcs::save::ReadComponent<TSave::Leash>(*leash, 0).anchor == world.a);
 }
@@ -185,20 +139,18 @@ TEST(Capture, WritesEachComponentOfEachSavedTypeUnderItsEntity)
 TEST(Capture, LeavesOutATypeNobodyHas)
 {
 	TRoundTrip::World world;
-	TRoundTrip::Log log;
 	world.ecs.RemoveComponent<TSave::Enemy>(world.a);
 
-	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter());
+	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs);
 
-	ASSERT_TRUE(lcs::save::FindChunk(captured.data, "Enemy") == nullptr);
+	ASSERT_TRUE(lcs::save::FindChunk(captured, "Enemy") == nullptr);
 }
 
 TEST(Capture, ChangesNothingInTheECS)
 {
 	TRoundTrip::World world;
-	TRoundTrip::Log log;
 
-	(void)lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter());
+	(void)lcs::save::Capture<TSave::MySchema>(world.ecs);
 
 	ASSERT_TRUE(world.ecs.GetComponent<TSave::Enemy>(world.a).strength == 30);
 	ASSERT_TRUE((TRoundTrip::EntitiesOf(world.ecs) == std::vector<TSave::EntityID>{ world.a, world.b, world.c }));
@@ -208,36 +160,10 @@ TEST(Capture, ChangesNothingInTheECS)
 TEST(Capture, AnEmptyECSIsAnEmptyContainer)
 {
 	TSave::ECS ecs;
-	TRoundTrip::Log log;
 
-	const auto captured = lcs::save::Capture<TSave::MySchema>(ecs, log.Reporter());
+	const auto captured = lcs::save::Capture<TSave::MySchema>(ecs);
 
-	ASSERT_TRUE(captured.data.entities.empty() && captured.data.chunks.empty());
-}
-
-TEST(Capture, ThePolicyCanRefuseAComponentWithAReason)
-{
-	TRoundTrip::World world;
-	TRoundTrip::Log log;
-	TRoundTrip::RecordingPolicy policy{ .refuse_enemies_over = true, .refuse_strength_over = 10 };
-
-	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter(), policy);
-
-	ASSERT_TRUE(captured.dropped_components == 1);
-	ASSERT_TRUE(lcs::save::FindChunk(captured.data, "Enemy") == nullptr);
-	ASSERT_TRUE(log.Has(lcs::save::Severity::Error, "Enemy", "too strong to keep"));
-}
-
-/* Tags are only an entity id: there is nothing to vet. */
-TEST(Capture, ThePolicyIsAskedAboutPlainComponentsAndNotAboutTags)
-{
-	TRoundTrip::World world;
-	TRoundTrip::Log log;
-	TRoundTrip::RecordingPolicy policy{};
-
-	(void)lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter(), policy);
-
-	ASSERT_TRUE(policy.accepted_calls == 5); /* 2 positions, enemy, follower, leash: not the one tag */
+	ASSERT_TRUE(captured.entities.empty() && captured.chunks.empty());
 }
 
 /*
@@ -248,16 +174,15 @@ TEST(Decode, ComponentsComeBackTypedUnderTheirEntities)
 {
 	TRoundTrip::World world;
 	TRoundTrip::Log log;
-	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter());
+	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs);
 
-	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(captured.data, log);
+	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(captured, log);
 
 	ASSERT_TRUE((decoded.entities == std::vector<TSave::EntityID>{ world.a, world.b, world.c }));
 	ASSERT_TRUE(decoded.Of<TSave::Position>().size() == 2);
 	ASSERT_TRUE(decoded.Of<TSave::Enemy>().size() == 1 && decoded.Of<TSave::Enemy>()[0].first == world.a);
 	ASSERT_TRUE(decoded.Of<TSave::Enemy>()[0].second.strength == 30);
 	ASSERT_TRUE(decoded.Of<TSave::Wet>().size() == 1);
-	ASSERT_TRUE(decoded.dropped_components == 0);
 	ASSERT_TRUE(log.lines.empty());
 }
 
@@ -265,8 +190,8 @@ TEST(Decode, ThroughTheBytesOfAFileToo)
 {
 	TRoundTrip::World world;
 	TRoundTrip::Log log;
-	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter());
-	const std::vector<std::byte> bytes = lcs::save::Encode(captured.data, TRoundTrip::format);
+	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs);
+	const std::vector<std::byte> bytes = lcs::save::Encode(captured, TRoundTrip::format);
 
 	const auto parsed = lcs::save::Parse<TSave::EntityID>(bytes, TRoundTrip::format, TSave::MySchema::entries);
 	ASSERT_TRUE(parsed.has_value()) << parsed.error().message;
@@ -288,66 +213,6 @@ TEST(Decode, AComponentOfAnEntityTheSaveDoesNotListIsAnError)
 	ASSERT_TRUE(decoded.error().message.find("entity 5") != std::string::npos);
 }
 
-TEST(Decode, ThePolicyCanChangeAComponentOnTheWayIn)
-{
-	TRoundTrip::World world;
-	TRoundTrip::Log log;
-	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter());
-	TRoundTrip::RecordingPolicy policy{ .add_to_position_x = 100 };
-
-	const auto decoded = lcs::save::Decode<TSave::MySchema>(captured.data, log.Reporter(), policy);
-
-	ASSERT_TRUE(decoded.has_value());
-	for (const auto& [entity, position] : decoded->Of<TSave::Position>())
-	{
-		ASSERT_TRUE(position.x >= 100);
-	}
-}
-
-TEST(Decode, ThePolicyCanDropAComponentWithAReason)
-{
-	TRoundTrip::World world;
-	TRoundTrip::Log log;
-	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter());
-	TRoundTrip::RecordingPolicy policy{ .refuse_enemies_over = true, .refuse_strength_over = 10 };
-
-	const auto decoded = lcs::save::Decode<TSave::MySchema>(captured.data, log.Reporter(), policy);
-
-	ASSERT_TRUE(decoded.has_value());
-	ASSERT_TRUE(decoded->Of<TSave::Enemy>().empty());
-	ASSERT_TRUE(decoded->dropped_components == 1);
-	ASSERT_TRUE(log.Has(lcs::save::Severity::Error, "Enemy", "entity 0 loaded without it: too strong to load"));
-	ASSERT_TRUE(decoded->Of<TSave::Position>().size() == 2); /* the rest loads */
-}
-
-TEST(Decode, ThePolicyCanFailTheWholeDecode)
-{
-	TRoundTrip::World world;
-	TRoundTrip::Log log;
-	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter());
-	TRoundTrip::RecordingPolicy policy{ .fail_on_follower = true };
-
-	const auto decoded = lcs::save::Decode<TSave::MySchema>(captured.data, log.Reporter(), policy);
-
-	ASSERT_TRUE(!decoded.has_value());
-	ASSERT_TRUE(decoded.error().kind == lcs::save::ErrorKind::Malformed);
-	ASSERT_TRUE(decoded.error().message.find("Follower of entity 2: it follows nobody the game knows") != std::string::npos);
-}
-
-TEST(Decode, ThePolicyIsNotAskedAboutTags)
-{
-	TRoundTrip::Data data = TRoundTrip::AContainer({ TSave::EntityID::CreateNew(0) });
-	lcs::save::AddTag<TSave::MySchema, TSave::Wet>(data, data.entities[0]);
-	TRoundTrip::Log log;
-	TRoundTrip::RecordingPolicy policy{};
-
-	const auto decoded = lcs::save::Decode<TSave::MySchema>(data, log.Reporter(), policy);
-
-	ASSERT_TRUE(decoded.has_value());
-	ASSERT_TRUE(policy.component_calls == 0);
-	ASSERT_TRUE(decoded->Of<TSave::Wet>().size() == 1);
-}
-
 TEST(Decode, AComponentThisBuildDoesNotKnowIsReportedAsAWarningAndTheRestLoads)
 {
 	TRoundTrip::Data data = TRoundTrip::AContainer({ TSave::EntityID::CreateNew(0) });
@@ -365,9 +230,9 @@ TEST(Decode, DecodingTouchesNoECS)
 {
 	TRoundTrip::World world;
 	TRoundTrip::Log log;
-	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter());
+	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs);
 
-	(void)TRoundTrip::MustDecode(captured.data, log);
+	(void)TRoundTrip::MustDecode(captured, log);
 
 	ASSERT_TRUE(world.ecs.GetComponent<TSave::Position>(world.a).x == 1);
 	ASSERT_TRUE(!world.ecs.HasDeferred());
@@ -381,8 +246,8 @@ TEST(Restore, PutsEveryEntityBackUnderItsOwnId)
 {
 	TRoundTrip::World world;
 	TRoundTrip::Log log;
-	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter());
-	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(captured.data, log);
+	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs);
+	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(captured, log);
 	TSave::ECS target;
 
 	lcs::save::Restore(target, decoded);
@@ -402,7 +267,7 @@ TEST(Restore, DefersTheComponentsAndFlushesNothing)
 {
 	TRoundTrip::World world;
 	TRoundTrip::Log log;
-	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter()).data, log);
+	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(lcs::save::Capture<TSave::MySchema>(world.ecs), log);
 	TSave::ECS target;
 
 	lcs::save::Restore(target, decoded);
@@ -420,7 +285,7 @@ TEST(Restore, AnIdThatHasBeenReusedKeepsItsValidationBits)
 	ASSERT_TRUE(reused.GetValidationID() != 0);
 	source.AddComponent<TSave::Position>(reused, { 8, 9 });
 	TRoundTrip::Log log;
-	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(lcs::save::Capture<TSave::MySchema>(source, log.Reporter()).data, log);
+	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(lcs::save::Capture<TSave::MySchema>(source), log);
 	TSave::ECS target;
 
 	lcs::save::Restore(target, decoded);
@@ -434,7 +299,7 @@ TEST(Restore, TheCallerChoosesWhatIsDeferred)
 {
 	TRoundTrip::World world;
 	TRoundTrip::Log log;
-	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter()).data, log);
+	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(lcs::save::Capture<TSave::MySchema>(world.ecs), log);
 	TSave::ECS target;
 	int visited = 0;
 
@@ -462,7 +327,7 @@ TEST(Restore, VisitsInTheSchemasOrder)
 {
 	TRoundTrip::World world;
 	TRoundTrip::Log log;
-	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter()).data, log);
+	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(lcs::save::Capture<TSave::MySchema>(world.ecs), log);
 	TSave::ECS target;
 	std::vector<std::string> order;
 
@@ -478,7 +343,7 @@ TEST(Restore, WorksAgainOnceTheECSIsCleared)
 {
 	TRoundTrip::World world;
 	TRoundTrip::Log log;
-	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter()).data, log);
+	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(lcs::save::Capture<TSave::MySchema>(world.ecs), log);
 	TSave::ECS target;
 	lcs::save::Restore(target, decoded);
 	target.FlushDeferred();
@@ -496,8 +361,8 @@ TEST(RoundTrip, AWorldThroughTheBytesOfAFileComesBackTheSame)
 {
 	TRoundTrip::World world;
 	TRoundTrip::Log log;
-	auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter());
-	const std::vector<std::byte> bytes = lcs::save::Encode(captured.data, TRoundTrip::format);
+	auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs);
+	const std::vector<std::byte> bytes = lcs::save::Encode(captured, TRoundTrip::format);
 
 	const auto parsed = lcs::save::Parse<TSave::EntityID>(bytes, TRoundTrip::format, TSave::MySchema::entries);
 	ASSERT_TRUE(parsed.has_value()) << parsed.error().message;
@@ -515,8 +380,8 @@ TEST(RoundTrip, AWorldThroughTheBytesOfAFileComesBackTheSame)
 
 	/* and a second capture of the copy is the same bytes */
 	TRoundTrip::Log second_log;
-	auto again = lcs::save::Capture<TSave::MySchema>(target, second_log.Reporter());
-	ASSERT_TRUE(lcs::save::Encode(again.data, TRoundTrip::format).size() == bytes.size());
+	auto again = lcs::save::Capture<TSave::MySchema>(target);
+	ASSERT_TRUE(lcs::save::Encode(again, TRoundTrip::format).size() == bytes.size());
 }
 
 
@@ -558,7 +423,6 @@ TEST(EntityIds, AreLoadedAsTheyWereWhetherOrNotTheSaveListsThem)
 	ASSERT_TRUE(decoded.Of<TSave::Follower>()[0].second.target == data.entities[1]);
 	ASSERT_TRUE(decoded.Of<TSave::Follower>()[1].second.target == TSave::EntityID::CreateNew(9));
 	ASSERT_TRUE(!decoded.Of<TSave::Leash>()[0].second.anchor.IsValid());
-	ASSERT_TRUE(decoded.dropped_components == 0);
 	ASSERT_TRUE(log.lines.empty());
 }
 
@@ -567,14 +431,13 @@ TEST(EntityIds, AReferenceToADestroyedEntityComesBackAsTheSameDeadId)
 {
 	TRoundTrip::WorldWithADeadTarget world;
 	TRoundTrip::Log log;
-	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter());
-	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(captured.data, log);
+	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs);
+	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(captured, log);
 	TSave::ECS target;
 
 	lcs::save::Restore(target, decoded);
 	target.FlushDeferred();
 
-	ASSERT_TRUE(decoded.dropped_components == 0);
 	ASSERT_TRUE(log.lines.empty());
 	ASSERT_TRUE(target.GetComponent<TSave::Follower>(world.follower).target == world.target);
 	ASSERT_TRUE(!world.ecs.IsAlive(world.target));
@@ -586,7 +449,7 @@ TEST(EntityIds, AReferenceToALiveEntityNamesItAgainAfterTheLoad)
 {
 	TRoundTrip::World world;
 	TRoundTrip::Log log;
-	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter()).data, log);
+	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(lcs::save::Capture<TSave::MySchema>(world.ecs), log);
 	TSave::ECS target;
 
 	lcs::save::Restore(target, decoded);
@@ -609,7 +472,7 @@ TEST(EntityIds, AReferenceToAReusedIndexDoesNotNameTheNewEntityAfterTheLoad)
 	const TSave::EntityID replacement = source.CreateEntity();
 	ASSERT_TRUE(replacement.GetIndex() == old_target.GetIndex() && replacement != old_target);
 	TRoundTrip::Log log;
-	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(lcs::save::Capture<TSave::MySchema>(source, log.Reporter()).data, log);
+	const TRoundTrip::Decoded decoded = TRoundTrip::MustDecode(lcs::save::Capture<TSave::MySchema>(source), log);
 	TSave::ECS target;
 
 	lcs::save::Restore(target, decoded);
@@ -620,105 +483,3 @@ TEST(EntityIds, AReferenceToAReusedIndexDoesNotNameTheNewEntityAfterTheLoad)
 	ASSERT_TRUE(!target.IsAlive(target.GetComponent<TSave::Follower>(follower).target));
 }
 
-/*
- *  A policy has the hooks it needs and nothing else
- */
-
-namespace TRoundTrip
-{
-	/* Capture hook for one component type only, not a template: every other type is let through. */
-	struct RefusesStrongEnemies
-	{
-		int asked{ 0 };
-
-		Verdict Accept(const EntityID, TSave::Enemy& copy)
-		{
-			asked++;
-			return copy.strength > 10 ? Verdict::Drop("too strong") : Verdict::Keep();
-		}
-	};
-
-	/* Decode hook for one component type only. */
-	struct MovesPositions
-	{
-		Verdict Component(const EntityID, TSave::Position& position)
-		{
-			position.x += 100;
-			return Verdict::Keep();
-		}
-	};
-
-	/* No hooks at all. */
-	struct SaysNothing {};
-}
-
-TEST(Policy, ACaptureHookForOneTypeIsAskedAboutThatTypeOnly)
-{
-	TRoundTrip::World world;
-	TRoundTrip::Log log;
-	TRoundTrip::RefusesStrongEnemies policy;
-
-	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter(), policy);
-
-	ASSERT_TRUE(policy.asked == 1);
-	ASSERT_TRUE(captured.dropped_components == 1);
-	ASSERT_TRUE(lcs::save::FindChunk(captured.data, "Enemy") == nullptr);
-	ASSERT_TRUE(lcs::save::FindChunk(captured.data, "Position") != nullptr); /* written as it is */
-	ASSERT_TRUE(lcs::save::FindChunk(captured.data, "Follower") != nullptr);
-}
-
-TEST(Policy, ADecodeHookForOneTypeChangesThatTypeOnly)
-{
-	TRoundTrip::World world;
-	TRoundTrip::Log log;
-	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter());
-
-	const auto decoded = lcs::save::Decode<TSave::MySchema>(captured.data, log.Reporter(), TRoundTrip::MovesPositions{});
-
-	ASSERT_TRUE(decoded.has_value());
-	for (const auto& [entity, position] : decoded->Of<TSave::Position>())
-	{
-		ASSERT_TRUE(position.x >= 101);
-	}
-	ASSERT_TRUE(decoded->Of<TSave::Enemy>()[0].second.strength == 30); /* no hook for it: as it is */
-}
-
-/* The hooks are separate: a policy written for one direction is not in the way of the other. */
-TEST(Policy, AHookForTheOtherDirectionIsNotCalled)
-{
-	TRoundTrip::World world;
-	TRoundTrip::Log log;
-	TRoundTrip::RefusesStrongEnemies capture_only;
-
-	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter(), TRoundTrip::MovesPositions{});
-	const auto decoded = lcs::save::Decode<TSave::MySchema>(captured.data, log.Reporter(), capture_only);
-
-	ASSERT_TRUE(captured.dropped_components == 0);
-	ASSERT_TRUE(decoded.has_value() && decoded->dropped_components == 0);
-	ASSERT_TRUE(capture_only.asked == 0);
-}
-
-TEST(Policy, ATypeWithNoHooksLetsEverythingThrough)
-{
-	TRoundTrip::World world;
-	TRoundTrip::Log log;
-
-	const auto captured = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter(), TRoundTrip::SaysNothing{});
-	const auto decoded = lcs::save::Decode<TSave::MySchema>(captured.data, log.Reporter(), TRoundTrip::SaysNothing{});
-
-	ASSERT_TRUE(captured.dropped_components == 0);
-	ASSERT_TRUE(decoded.has_value() && decoded->dropped_components == 0);
-	ASSERT_TRUE(decoded->Of<TSave::Enemy>().size() == 1 && decoded->Of<TSave::Position>().size() == 2);
-}
-
-TEST(Policy, NoPolicyIsTheDefaultAndCanBeSaidOutLoud)
-{
-	TRoundTrip::World world;
-	TRoundTrip::Log log;
-
-	const auto implicit = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter());
-	const auto spoken = lcs::save::Capture<TSave::MySchema>(world.ecs, log.Reporter(), lcs::save::NoPolicy{});
-
-	ASSERT_TRUE(implicit.data.chunks.size() == spoken.data.chunks.size());
-	ASSERT_TRUE(implicit.dropped_components == 0 && spoken.dropped_components == 0);
-}

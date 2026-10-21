@@ -44,8 +44,9 @@
  *  Every component and tag of the ECS says whether it is saved. One that does not
  *  breaks the build, so none goes missing from every save unnoticed; one that is
  *  saved without a save_name does too. The saved types are visited in
- *  the order the ECS lists its types. A game's own hooks (the policies of Capture
- *  and Decode) can look for members of their own in the same way.
+ *  the order the ECS lists its types. A game's own members on its components (the
+ *  handles in them, say) are its own to look for, over the same list, in what Capture
+ *  returns and what Decode gives back.
  */
 namespace lcs::save
 {
